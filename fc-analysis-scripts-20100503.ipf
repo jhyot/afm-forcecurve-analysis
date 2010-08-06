@@ -2,16 +2,42 @@
 #include <FilterDialog> menus=0
 #include <SaveGraph>
 
+// **** USER CONFIGURABLE CONSTANTS ****
+//
 // Change constants to adjust procedure behaviour
-// Begin constant declarations
-static StrConstant ksFilter = ".spm"		// Filter for reading FC files in folder
-static StrConstant ksVersionReq = "0x07300000" // Required version of FC file; for now, only works with one specific version (NOTE: only tested with 0x07300000)
-static Constant ksDataLength = 4096 // Points per FC; for now only works with same for all curves
-static StrConstant ksFileType = "FOL"	// FC file type as written in header
-static StrConstant ksHeaderEnd = "\\*File list end\r"  // String to be matched (full match, case insensitive) at header end
-// End constant declarations
+
+// Filter for reading force curve files in folder
+static StrConstant ksFilter = ".spm"
+
+// Required version of FC file
+// for now, only tested with 0x07300000)
+static StrConstant ksVersionReq = "0x07300000" 
+
+// Points per FC
+// for now only works with 4096
+static Constant ksDataLength = 4096
+
+// FC file type as written in header
+static StrConstant ksFileType = "FOL"
+
+// String to be matched (full match, case insensitive) at header end
+static StrConstant ksHeaderEnd = "\\*File list end\r"
+
+//
+// **** END USER CONFIGURABLE CONSTANTS ****
+//
+
+
+
+// Start FC analysis with empty path
+Function AnalyseFC()
+	AnalyseAllFCInFolder("")
+End Function
+
+
 
 // Analyse all force curves (FC) in a folder
+// Returns 0 on success, -1 on error
 Function AnalyseAllFCInFolder(path)
 	String path			// Symbolic path name
 	
@@ -105,6 +131,7 @@ End
 
 
 // Kills all waves in the current data folder starting with fc
+// Returns 0 on success
 Function KillPreviousWaves()
 	Variable i = 0
 	String wList
@@ -514,6 +541,17 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 End
 
 
+// Interactive review of force curves and curve fits
+// Displays curves one by one and allows the user
+// to accept or reject a given curve + fit.
+// Rejected curve names and brush heights are
+// moved to separate waves
+// Expects following parameters:
+// String names: name of wave filled with curve names to be reviewed
+// String heights: name of wave filled with corresponding brush heights
+// Rejected names and heights are moved to waves with same names but "_del" appended
+// "names" wave is 2D with names[i][0] being the FC wave name,
+// names[i][1] is the original filename of the curve
 Function ReviewCurves(names, heights)
 	String names, heights
 	
@@ -523,6 +561,7 @@ Function ReviewCurves(names, heights)
 	Variable total = numpnts(wHeights)
 	Variable deleted = 0
 	
+	// Create waves for rejected curves
 	if (WaveExists($(names + "_del")))
 		KillWaves $(names + "_del")
 	endif
@@ -539,6 +578,8 @@ Function ReviewCurves(names, heights)
 	String wname, header, shortHeader
 	Variable totalTmp = total
 	
+	// Create and change to temporary data folder
+	// for the duration of the review
 	NewDataFolder/O root:tmp_reviewDF
 	
 	for (i=0; i < totalTmp; i+=1)
@@ -549,6 +590,7 @@ Function ReviewCurves(names, heights)
 		
 		header = note(w)
 		
+		// Display current force vs tip-sample distance and exponential fit
 		DoWindow/K tmp_reviewgraph
 		Display/N=tmp_reviewgraph w vs xTSD
 		AppendToGraph expfit
@@ -557,6 +599,9 @@ Function ReviewCurves(names, heights)
 		
 		Variable/G root:tmp_reviewDF:rejected = 0
 		
+		// Create and show dialog window
+		// with Accept, Zoom and Reject buttons
+		// and some header data about current curve
 		NewPanel/K=2 /W=(300,300,600,600) as "Accept or reject curve?"
 		DoWindow/C tmp_reviewDialog
 		AutoPositionWindow/E/M=0/R=tmp_reviewgraph
@@ -576,11 +621,15 @@ Function ReviewCurves(names, heights)
 		Button button2,pos={30,215},size={100,40},title="Reject"
 		Button button2,proc=ReviewCurves_Reject
 
+		// Wait for user interaction (ends when dialog window is killed)
 		PauseForUser tmp_reviewDialog, tmp_reviewgraph
 
+		// Will be set to 1 if user pressed Reject button in review dialog
 		NVAR gRej = root:tmp_reviewDF:rejected
 		Variable rej = gRej
 		
+		// If rejected, copy the name and brush height of the curve to _del waves
+		// then delete the curve from original wave
 		if (rej)
 			wNamesDel[deleted][0] = wNames[i][0]
 			wNamesDel[deleted][1] = wNames[i][1]
@@ -658,13 +707,13 @@ End
 
 // waves: StringList of wave names (";" as separator)
 // from, to: average wave range [from, to] (both inclusive)
-// wave for averaged values
+// wavg, wsd: waves for averaged values and standard deviations
 Function AvgWaves(waves, from, to, wavg, wsd)
 	String waves
 	Variable from, to
 	WAVE wavg, wsd
 	
-	if (numpnts(wavg) < (to-from+1))
+	if ((numpnts(wavg) < (to-from+1)) || (numpnts(wsd) < (to-from+1)))
 		Print "Target wave is not big enough"
 		return -1
 	endif
