@@ -131,7 +131,7 @@ End
 
 
 // Kills all waves in the current data folder starting with fc
-// Returns 0 on success
+// Returns 0 on success, -1 on error
 Function KillPreviousWaves()
 	Variable i = 0
 	String wList
@@ -145,7 +145,12 @@ Function KillPreviousWaves()
 			return 0
 		endif
 		
-		KillWaves $w
+		try
+			KillWaves $w; AbortOnRTE
+		catch
+			Print "Error in KillWaves. fc* waves in use? Errcode " + num2str(GetRTError(1))
+			return -1
+		endtry
 		i += 1
 	while(1)
 End
