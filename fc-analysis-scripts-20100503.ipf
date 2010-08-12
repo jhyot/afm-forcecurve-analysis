@@ -1,6 +1,6 @@
 #pragma rtGlobals=1		// Use modern global access method.
-#include <FilterDialog> menus=0
-#include <SaveGraph>
+
+#define DEBUG
 
 // **** USER CONFIGURABLE CONSTANTS ****
 //
@@ -411,7 +411,366 @@ Function readFileIntoWave(filename, wname, headerEnd)
 	Close refNum
 	return line
 End
+
+
+// Opens JPK force volume file and reads all curves
+// into waves. Also extracts appropriate headers
+//
+// Parameters:
+// String filename: full path to FV file
+// 
+// Return:
+// 0 if no errors, -1 otherwise
+Function readFVIntoWaves_JPK(filename)
+	String filename			// full path + filename of JPK FV file	
+	
+	Variable result
+	Variable index=0
+	Variable success=0
+	String fcHeaderData, fvHeaderData
+	
+	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
+	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
+	result = KillPreviousWaves()
+	if (result != 0)
+		Print "Error killing previous waves"
+		return -1
+	endif
+
+	// Get temp path from OS
+	String tempPath = SpecialDirPath("Temporary", 0, 0, 0)
+	
+	// Create subfolder in temp path
+	String unzipPath = tempPath+"jpkunzip"
+	NewPath/Q/O/C tempPathSym, unzipPath
+	
+	Print "Unzipping FV file..."
+	
+	// Unzip file to temporary location
+	// Needs ZIP XOP for this
+	ZIPfile/O/X unzipPath, filename
+	
+	Print "Unzipping done."
+	
+	result = parseFVHeader_JPK(unzipPath, fvHeaderData)
+	if (result != 0)
+		Print "Error parsing FV header(s)"
+		return -1
+	endif
+	
+	// For all FCs, parse header and read data into waves
+	Variable nMin = str2num(StringByKey("nMin", fvHeaderData))
+	Variable nMax = str2num(StringByKey("nMax", fvHeaderData))
+	String channelPath
+	Variable i
+	Variable rampSize
+	for (i = nMin; i <= nMax; i += 1)
+		// Parse FC header
+		result = parseFCHeader_JPK(unzipPath, i, fcHeaderData)
+		if (result != 0)
+			Print "Error parsing FC header " + num2str(i) + " from " + unzipPath
+			return -1
+		endif
+		
+		// Read height data, save as wave, and use to calculate ramp size
+		channelPath = unzipPath + ":index:" + num2str(i) + ":segments:0:channels:"
+		GBLoadWave/N=wtemp/Q/T={2,4} (channelPath + "height.dat")
+		if (V_flag != 1)
+			Print "Error reading height data index " + num2str(i) + " from " + channelPath
+			return -1
+		endif
+		
+		WAVE wtemp0
+		
+		// convert raw data to nm
+		wtemp0 *= str2num(StringByKey("rampSizeConv", fcHeaderData))
+
+		WaveStats/Q wtemp0
+		rampSize = V_max - V_min
+		fcHeaderData += "rampSize:" + num2str(rampSize) + ";"
+		
+		// Final wave name fc<i>_x
+		Duplicate/O wtemp0, $("fc" + num2str(i) + "_x")
+		
+		
+		// Read vertical deflection data into wave
+		GBLoadWave/N=wtemp/Q/T={2,4} (channelPath + "vDeflection.dat")
+		if (V_flag != 1)
+			Print "Error reading height data index " + num2str(i) + " from " + channelPath
+			return -1
+		endif
+		
+		// check if height wave and vdeflection wave have same number of points
+		if (numpnts(wtemp0) != numpnts($("fc" + num2str(i) + "_x")))
+			Print "Error: height and vDeflection data waves have different number of points"
+			Print "in index " + num2str(i) + " of " + channelPath
+			return -1
+		endif
+		
+		Duplicate/O wtemp0, $("fc" + num2str(i))
+		Note/K $("fc" + num2str(i)), fvHeaderData + fcHeaderData
+		
+	endfor
+	
+	KillPath tempPathSym
+	
+	return 0
+
 End
+
+
+// Read and parse JPK FV headers given by path.
+//
+// Parameters:
+// String path: path to force volume data root
+// String &fvHeaderData: String to store header data in (pass by ref)
+// 
+// Return:
+// 0 if no errors, -1 otherwise
+//
+// fvHeaderData is in "key1:value1;key2:value2;" format
+// keys:
+// nMin				First FC index
+// nMax				Last FC index
+// iLength			Grid size in i direction
+// jLength			Grid size in j direction
+Function parseFVHeader_JPK(path, fvHeaderData)
+	String path
+	String &fvHeaderData
+	
+	Variable result
+	fvHeaderData = ""
+	
+	if (stringmatch(path, "*:") == 0)
+		path += ":"
+	endif
+
+	
+	// ===============================
+	// Extract relevant FV header data
+	// ===============================
+	
+	// Read force volume header lines into a wave
+	result = readFileIntoWave(path + "header.properties", "fvHeader", "")
+	if (result <= 0)
+		Print "Could not read FV header"
+		return -1
+	endif
+
+
+	WAVE/T fvHeader
+	
+	
+	// Check if correct filetype and version
+	String fvFileTypeReq = "spm-force-scan-map-file"
+	String fvVersionReq = "0.6"
+	String s
+	
+	FindValue/TEXT="jpk-data-file=" fvHeader
+	if (V_value < 0)
+		Print "Filetype not found"
+		return -1
+	endif
+	SplitString/E="^jpk-data-file=(.+?)\\s*$" fvHeader[V_value], s
+	if (cmpstr(s, fvFileTypeReq) != 0)
+		Print "Wrong filetype (non-FV file)"
+		return -1
+	endif
+	
+	FindValue/TEXT="file-format-version=" fvHeader
+	if (V_value < 0)
+		Print "File version not found"
+		return -1
+	endif
+	SplitString/E="^file-format-version=(.+?)\\s*$" fvHeader[V_value], s
+	if (cmpstr(s, fvVersionReq) != 0)
+		Print "Wrong FV file version"
+		return -1
+	endif
+	
+
+	// Get number of force curves
+	Variable nMin, nMax
+	FindValue/TEXT="force-scan-map.indexes.min=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.indexes.min not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.indexes.min=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.indexes.min invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "nMin:" + s + ";"
+		nMin = str2num(s)
+	endif
+	
+	FindValue/TEXT="force-scan-map.indexes.max=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.indexes.max not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.indexes.max=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.indexes.max invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "nMax:" + s + ";"
+		nMax = str2num(s)
+	endif
+	
+	if (nMax - nMin + 1 <= 0)
+		Print "Error: Less than 1 force curve according to header"
+		return -1
+	endif
+	
+	
+	// Get grid side lenghts
+	FindValue/TEXT="force-scan-map.position-pattern.grid.ilength=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.position-pattern.grid.ilength not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.position-pattern.grid.ilength=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.position-pattern.grid.ilength invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "iLength:" + s + ";"
+	endif
+	
+	FindValue/TEXT="force-scan-map.position-pattern.grid.jlength=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.position-pattern.grid.jlength not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.position-pattern.grid.jlength=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.position-pattern.grid.jlength invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "jLength:" + s + ";"
+	endif
+	
+	return 0	
+End
+
+
+
+// Read and parse JPK FC headers given by path and curve index.
+// Currently only reads approach curve header (segment 0) .
+//
+// Parameters:
+// String path: path to force volume data root
+// Variable index: index of force curve to read
+// String &fcHeaderData: String to store header data in (pass by ref)
+// 
+// Return:
+// 0 if no errors, -1 otherwise
+//
+// fcHeaderData is in "key1:value1;key2:value2;" format
+// keys:
+// rampSizeConv	Conversion factor from raw to nm in Z height data
+// deflSens			Deflection sensitivity in nm/V
+// springConst		Spring constant in nN/nm
+Function parseFCHeader_JPK(path, index, fcHeaderData)
+	String path
+	Variable index
+	String &fcHeaderData
+	
+	Variable result
+	String s
+	fcHeaderData = ""
+	
+	if (stringmatch(path, "*:") == 0)
+		path += ":"
+	endif
+	
+	
+	// ===============================
+	// Extract relevant FC header data
+	// ===============================
+
+	// Read force curve header lines into a wave.
+	// Use 0th "segment", i.e. approach curve.
+	String fcHeaderFile = path + "index:" + num2str(index)
+	fcHeaderFile += ":segments:0:segment-header.properties"
+	
+	result = readFileIntoWave(fcHeaderFile, "fcHeader", "")
+	if (result <= 0)
+		Print "Could not read FC header"
+		return -1
+	endif
+
+	WAVE/T fcHeader
+	
+	// Get Z piezo ramp size multiplier for converting raw value to nm
+	// CHECK IF THIS IS CORRECT.... NOT FULLY CLEAR FROM JPK HEADER FILES
+	
+	// Get "nominal" ramp size multiplier
+	FindValue/TEXT="channel.height.conversion-set.conversion.nominal.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.height.conversion-set.conversion.nominal.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	Variable rampSizeConv = str2num(s)
+	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
+		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	endif
+	
+	// Get "calibrated" ramp size multiplier
+	FindValue/TEXT="channel.height.conversion-set.conversion.calibrated.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.height.conversion-set.conversion.calibrated.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	rampSizeConv *= str2num(s)
+	rampSizeConv *= 1e9	// conversion m to nm
+	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
+		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	else
+		fcHeaderData += "rampSizeConv:" + num2str(rampSizeConv) + ";"
+	endif
+	
+	
+	// Get deflection sensitivity in nm/V
+	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	Variable deflSens = str2num(s)
+	if (cmpstr(num2str(deflSens), "NaN") == 0)
+		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	else
+		fcHeaderData += "deflSens:" + num2str(deflSens * 1e9) + ";"
+	endif
+
+	// Get spring constant in nN/nm
+	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	Variable springConst = str2num(s)
+	if (cmpstr(num2str(springConst), "NaN") == 0)
+		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	else
+		fcHeaderData += "springConst:" + num2str(springConst) + ";"
+	endif
+	
+	return 0
+End
+
+
 
 // Analyse brush height, performing all the necessary data processing steps.
 // Works in the current data folder with the wave named fc<i> with <i> being the index parameter.
