@@ -173,10 +173,11 @@ Function ParseFCHeader(path, fileName, headerData)
 	Variable result, subGroupOffset
 	headerData = ""
 	
-	
-	result = ReadFCHeaderLines(path, fileName)
-	if (result != 0)
-		Print fileName + ": Did not find header end\r"
+	PathInfo path
+	String pathString = S_path
+	result = readFileIntoWave(S_path + filename, "fullHeader", ksHeaderEnd)
+	if (result <= 0)
+		Print fileName + ": Couldn't read header\r"
 		return -1
 	endif
 	
@@ -347,28 +348,30 @@ Function ParseFCHeader(path, fileName, headerData)
 	return 0	
 End
 
-// Read FC file given by path and fileName.
-// Add all lines into a new text wave (fullHeader)
-// return 0 if end of header found (defined by ksHeaderEnd)
+// Reads a file from String fileName (full path).
+// Add all lines into a new text wave (String wname)
+// String headerEnd indicates up to which part of the file to read
+// (if empty, read full file)
+// Return number of lines read if successful
 // -1 otherwise.
-// Last line of header not included in fullHeader.
-// CR (\r) is at end of each line in the wave.
-Function ReadFCHeaderLines(path, fileName)
-	String path, fileName
+Function readFileIntoWave(filename, wname, headerEnd)
+	String filename, wname, headerEnd
 	
-	Variable result = -1			// Set to 0 if end of header found
-	
-	if ((strlen(path) == 0) || (strlen(fileName) == 0))
+	if ((strlen(filename) == 0) || (strlen(wname) == 0))
 		return -1
-	endif
+	endif	
+	
+	
+	// Read line by line until header end or file end reached
 	
 	Variable refNum
-	Open/R/P=$path refNum as fileName				
+	Open/R refNum as fileName		
 	if (refNum == 0)	
 		return -1						// Error
 	endif
 
-	Make/T/O/N=0 fullHeader		// Make new text wave, overwrite old if needed
+	Make/T/O/N=0 $wname		// Make new text wave, overwrite old if needed
+	WAVE/T w = $wname
 	
 	Variable len
 	String buffer
@@ -379,22 +382,35 @@ Function ReadFCHeaderLines(path, fileName)
 		
 		len = strlen(buffer)
 		if (len == 0)
-			break										// No more lines to be read
+			if (strlen(headerEnd) > 0)
+				// Header end was specified but not found, return error
+				line = -1
+				break
+			else
+				// Correctly reached file end
+				break
+			endif
 		endif
 		
-		if (cmpstr(buffer, ksHeaderEnd) == 0)
-			result = 0								// End of header reached
-			break
+		Redimension/N=(line+1) w		// Add one more row to wave
+		// If line terminator (always \r, see FReadLine help) at end of line, remove it
+		if (cmpstr(buffer[len-1], "\r") == 0)
+			len -= 1
 		endif
-		
-		Redimension/N=(line+1) fullHeader		// Add one more row to wave
-		fullHeader[line] = buffer[0,len-2]		// Add line to wave, omit trailing CR char
+		w[line] = buffer[0,len-1]
 
 		line += 1
+		
+		if (strlen(headerEnd) > 0)
+			if (cmpstr(buffer, headerEnd) == 0)
+				break							// End of header reached
+			endif
+		endif
 	while (1)
 
 	Close refNum
-	return result
+	return line
+End
 End
 
 // Analyse brush height, performing all the necessary data processing steps.
