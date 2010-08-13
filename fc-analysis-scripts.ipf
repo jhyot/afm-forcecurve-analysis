@@ -416,6 +416,73 @@ Function readFileIntoWave(filename, wname, headerEnd)
 End
 
 
+// Splits a given string by line terminators and adds them to a text wave
+// line by line.
+//
+// Parameters:
+// String str: String to parse
+// String wname: Name of wave to fill. Does not have to exist; will be overwritten.
+// String headerEnd: Read up to the line given by this string (without line terminator).
+//					  If empty, add whole string
+// Return:
+// Returns number of lines read if successful, -1 otherwise.
+// -1 is also returned if headerEnd was specified but not found in the string
+Function readStringIntoWave(str, wname, headerEnd)
+	String str, wname, headerEnd
+	
+	if ((strlen(str) == 0) || (strlen(wname) == 0))
+		return -1
+	endif	
+	
+	// Normalize line terminators to \r
+	str = ReplaceString("\r\n", str, "\r")
+	str = ReplaceString("\n", str, "\r")
+
+
+	Make/T/O/N=0 $wname		// Make new text wave, overwrite old if needed
+	WAVE/T w = $wname
+	
+	Variable line = 0 // number of lines read
+	Variable p = 0 // pointer to current position in string
+	Variable lineEnd
+	
+	do
+		Redimension/N=(line+1) w		// Add one more row to wave
+		
+		lineEnd = strsearch(str, "\r", p)
+
+		line += 1
+
+		if (lineEnd < 0)
+			// last line without terminator? read all and exit loop
+			w[line-1] = str[p, strlen(str)-1]
+			
+			if (strlen(headerEnd) > 0)
+				if (cmpstr(headerEnd, w[line-1]) != 0)
+					// Is last line, but not header end, return error
+					line = -1
+				endif
+			endif
+
+			break
+		else
+			// read line w/o terminator and move pointer
+			w[line] = str[p, lineEnd-1]
+			p = lineEnd + 1
+		endif
+		
+		
+		if (p >= strlen(str))
+			// was last line
+			break
+		endif
+		
+	while (1)
+
+	return line
+End
+
+
 // Opens JPK force volume file and reads all curves
 // into waves. Also extracts appropriate headers
 //
