@@ -429,6 +429,10 @@ Function readFVIntoWaves_JPK(filename)
 	Variable success=0
 	String fcHeaderData, fvHeaderData
 	
+	#ifdef DEBUG
+		Variable timer0 = ticks
+	#endif
+	
 	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
 	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
 	result = KillPreviousWaves()
@@ -446,11 +450,20 @@ Function readFVIntoWaves_JPK(filename)
 	
 	Print "Unzipping FV file..."
 	
+	#ifdef DEBUG
+		Variable timer1 = ticks
+	#endif
+		
 	// Unzip file to temporary location
 	// Needs ZIP XOP for this
 	ZIPfile/O/X unzipPath, filename
 	
 	Print "Unzipping done."
+	
+	#ifdef DEBUG
+		Print "DEBUG: ZIPfile time " + num2str((ticks - timer1)/60) + " s"
+	#endif
+	
 	
 	result = parseFVHeader_JPK(unzipPath, fvHeaderData)
 	if (result != 0)
@@ -513,6 +526,10 @@ Function readFVIntoWaves_JPK(filename)
 	endfor
 	
 	KillPath tempPathSym
+	
+	#ifdef DEBUG
+		Print "DEBUG: readFVIntoWaves_JPK time " + num2str((ticks - timer0)/60) + " s"
+	#endif
 	
 	return 0
 
