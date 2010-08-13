@@ -743,6 +743,175 @@ Function parseFVHeader_JPK(path, fvHeaderData)
 End
 
 
+// Read and parse JPK FV header given by filename.
+// Reads from zip by streaming.
+//
+// Parameters:
+// String filename: full path to packed JPK FV file
+// String &fvHeaderData: String to store header data in (pass by ref)
+// 
+// Return:
+// 0 if no errors, -1 otherwise
+//
+// fvHeaderData is in "key1:value1;key2:value2;" format
+// keys:
+// nMin				First FC index
+// nMax				Last FC index
+// iLength			Grid size in i direction
+// jLength			Grid size in j direction
+Function parseFVHeader_JPK_stream(filename, fvHeaderData)
+	String filename
+	String &fvHeaderData
+	
+	Variable result
+	fvHeaderData = ""
+	
+	// Get FV header into a string
+	Variable ref
+	String headerstream = ""
+	ref = ZIPa_openArchive(filename)
+	
+	if (ref <= 0)
+		Print "Error opening FV file: " + filename
+		return -1
+	endif
+
+	Variable ret
+	ret = ZIPa_open(ref, "header.properties")
+	
+	if (ret != 0)
+		Print "Error selecting header.properties from " + filename
+		return -1
+	endif
+ 
+	// Read in 100 byte chunks from ref to buf,
+	// append to headerstream
+	String buf = ""
+	Do
+		ZIPa_read ref, buf, 100
+		if (V_flag < 0)
+			Print "Error reading FV header from: " + filename
+			return -1
+		elseif (V_flag == 0)
+			// End of file reached
+			break
+		endif
+		
+		headerstream += buf
+	while (1)
+	
+	ZIPa_closeArchive(ref)
+	
+	// ===============================
+	// Extract relevant FV header data
+	// ===============================
+	
+	// Read force volume header lines into a wave
+	result = readStringIntoWave(headerstream, "fvHeader", "")
+	if (result <= 0)
+		Print "Error saving FV header into wave"
+		return -1
+	endif
+
+
+	WAVE/T fvHeader
+	
+	
+	// Check if correct filetype and version
+	String fvFileTypeReq = "spm-force-scan-map-file"
+	String fvVersionReq = "0.6"
+	String s
+	
+	FindValue/TEXT="jpk-data-file=" fvHeader
+	if (V_value < 0)
+		Print "Filetype not found"
+		return -1
+	endif
+	SplitString/E="^jpk-data-file=(.+?)\\s*$" fvHeader[V_value], s
+	if (cmpstr(s, fvFileTypeReq) != 0)
+		Print "Wrong filetype (non-FV file)"
+		return -1
+	endif
+	
+	FindValue/TEXT="file-format-version=" fvHeader
+	if (V_value < 0)
+		Print "File version not found"
+		return -1
+	endif
+	SplitString/E="^file-format-version=(.+?)\\s*$" fvHeader[V_value], s
+	if (cmpstr(s, fvVersionReq) != 0)
+		Print "Wrong FV file version"
+		return -1
+	endif
+	
+
+	// Get number of force curves
+	Variable nMin, nMax
+	FindValue/TEXT="force-scan-map.indexes.min=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.indexes.min not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.indexes.min=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.indexes.min invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "nMin:" + s + ";"
+		nMin = str2num(s)
+	endif
+	
+	FindValue/TEXT="force-scan-map.indexes.max=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.indexes.max not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.indexes.max=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.indexes.max invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "nMax:" + s + ";"
+		nMax = str2num(s)
+	endif
+	
+	if (nMax - nMin + 1 <= 0)
+		Print "Error: Less than 1 force curve according to header"
+		return -1
+	endif
+	
+	
+	// Get grid side lenghts
+	FindValue/TEXT="force-scan-map.position-pattern.grid.ilength=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.position-pattern.grid.ilength not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.position-pattern.grid.ilength=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.position-pattern.grid.ilength invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "iLength:" + s + ";"
+	endif
+	
+	FindValue/TEXT="force-scan-map.position-pattern.grid.jlength=" fvHeader
+	if (V_value < 0)
+		Print "force-scan-map.position-pattern.grid.jlength not found"
+		return -1
+	endif
+	SplitString/E="^force-scan-map.position-pattern.grid.jlength=(\\d+?)\\s*$" fvHeader[V_value], s
+	if (strlen(s) <= 0)
+		Print "force-scan-map.position-pattern.grid.jlength invalid: " + fvHeader[V_value]
+		return -1
+	else
+		fvHeaderData += "jLength:" + s + ";"
+	endif
+	
+	return 0	
+End
+
+
 
 // Read and parse JPK FC headers given by path and curve index.
 // Currently only reads approach curve header (segment 0) .
