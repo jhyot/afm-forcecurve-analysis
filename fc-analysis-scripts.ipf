@@ -1170,12 +1170,13 @@ Function DebugTest()
 	Print tmpHd
 End
 
+
 Function Unziptest()
 	//function reads a file from a zip archive into memory
 	// and returns it as a string
 
 	Variable ref
-//	ref = ZIPa_openArchive("C:Users:Janne:Desktop:jpkfv.jpk-force-map")
+	ref = ZIPa_openArchive("C:Users:Janne:Desktop:jpkfv.jpk-force-map")
 	
 	if (ref <= 0)
 		Print "Error opening archive"
@@ -1183,10 +1184,10 @@ Function Unziptest()
 	endif
 		
 	// Directory + file list
-//	String ls = ZIPa_ls(ref)
+	String ls = ZIPa_ls(ref)
 	
 	print "open:"
-//	print ZIPa_open(ref, "header.properties")			
+	print ZIPa_open(ref, "index/0/segments/0/segment-header.properties")			
  
 	String buf=""
 	// Read 100 bytes from ref to buf
@@ -1196,7 +1197,7 @@ Function Unziptest()
 		return -1
 	endif
 	
-//	ZIPa_closeArchive(ref)
+	ZIPa_closeArchive(ref)
 
 	Print num2str(V_flag) + " bytes read"
 	Print buf
