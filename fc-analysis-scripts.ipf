@@ -1027,6 +1027,150 @@ Function parseFCHeader_JPK(path, index, fcHeaderData)
 End
 
 
+// Read and parse JPK FC headers given by index from packed fv file.
+// Currently only reads approach curve header (segment 0).
+//
+// Parameters:
+// String filename: full path to force volume file
+// Variable index: index of force curve to read
+// String &fcHeaderData: String to store header data in (pass by ref)
+// 
+// Return:
+// 0 if no errors, -1 otherwise
+//
+// fcHeaderData is in "key1:value1;key2:value2;" format
+// keys:
+// rampSizeConv	Conversion factor from raw to nm in Z height data
+// deflSens			Deflection sensitivity in nm/V
+// springConst		Spring constant in nN/nm
+Function parseFCHeader_JPK_stream(filename, index, fcHeaderData)
+	String filename
+	Variable index
+	String &fcHeaderData
+	
+	Variable result
+	String s
+	fcHeaderData = ""
+	
+	// Read force curve header lines into a wave.
+	// Use 0th "segment", i.e. approach curve.
+	String fcHeaderFile = "index/" + num2str(index)
+	fcHeaderFile += "/segments/0/segment-header.properties"
+	
+	Variable ref
+	String headerstream = ""
+	ref = ZIPa_openArchive(filename)
+	
+	if (ref <= 0)
+		Print "Error opening FV file: " + filename
+		return -1
+	endif
+
+	Variable ret
+	ret = ZIPa_open(ref, fcHeaderFile)
+	
+	if (ret != 0)
+		Print "Error selecting " + fcHeaderFile + " from " + filename
+		return -1
+	endif
+ 
+	// Read in 100 byte chunks from ref to buf,
+	// append to headerstream
+	String buf = ""
+	Do
+		ZIPa_read ref, buf, 100
+		if (V_flag < 0)
+			Print "Error reading FV header from: " + filename
+			return -1
+		elseif (V_flag == 0)
+			// End of file reached
+			break
+		endif
+		
+		headerstream += buf
+	while (1)
+	
+	ZIPa_closeArchive(ref)
+	
+	result = readStringIntoWave(headerstream, "fcHeader", "")
+	if (result <= 0)
+		Print "Could not read FC header"
+		return -1
+	endif
+
+	WAVE/T fcHeader
+	
+	// ===============================
+	// Extract relevant FC header data
+	// ===============================
+	
+	// Get Z piezo ramp size multiplier for converting raw value to nm
+	// CHECK IF THIS IS CORRECT.... NOT FULLY CLEAR FROM JPK HEADER FILES
+	
+	// Get "nominal" ramp size multiplier
+	FindValue/TEXT="channel.height.conversion-set.conversion.nominal.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.height.conversion-set.conversion.nominal.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	Variable rampSizeConv = str2num(s)
+	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
+		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	endif
+	
+	// Get "calibrated" ramp size multiplier
+	FindValue/TEXT="channel.height.conversion-set.conversion.calibrated.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.height.conversion-set.conversion.calibrated.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	rampSizeConv *= str2num(s)
+	rampSizeConv *= 1e9	// conversion m to nm
+	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
+		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	else
+		fcHeaderData += "rampSizeConv:" + num2str(rampSizeConv) + ";"
+	endif
+	
+	
+	// Get deflection sensitivity in nm/V
+	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	Variable deflSens = str2num(s)
+	if (cmpstr(num2str(deflSens), "NaN") == 0)
+		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	else
+		fcHeaderData += "deflSens:" + num2str(deflSens * 1e9) + ";"
+	endif
+
+	// Get spring constant in nN/nm
+	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=" fcHeader
+	if (V_value < 0)
+		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier not found"
+		return -1
+	endif
+	SplitString/E="^channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
+	Variable springConst = str2num(s)
+	if (cmpstr(num2str(springConst), "NaN") == 0)
+		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier invalid: " + fcHeader[V_value]
+		return -1
+	else
+		fcHeaderData += "springConst:" + num2str(springConst) + ";"
+	endif
+	
+	return 0
+End
+
+
 
 // Analyse brush height, performing all the necessary data processing steps.
 // Works in the current data folder with the wave named fc<i> with <i> being the index parameter.
