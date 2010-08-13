@@ -482,6 +482,81 @@ Function readStringIntoWave(str, wname, headerEnd)
 	return line
 End
 
+// Read data from a file in a zip archive directly into a wave,
+// converting to desired data type at the same time.
+//
+// Parameters:
+// String zippedfile: Full path to zip file on the filesystem
+// String filename: Path to file to be read within the archive, in POSIX format ("/")
+// String wname: Wave name where to write data. Does not need to exist, will be overwritten
+// Integer wtype: Type of data, as in WaveType:
+//				  2 = 32bit float, 4 = 64bit double, 8 = 8bit int, 16 = 16bit int, 32 = 32bit int
+//				  complex numbers and unsigned int als possible, see WaveType help
+// Integer endian: 0 for little endian, 1 for big endian
+//
+// Return:
+// Returns 0 if successful, -1 otherwise
+Function readZipDataIntoWave(zippedfile, filename, wname, wtype, endian)
+	String zippedfile, filename, wname
+	Variable wtype, endian
+	
+	if ((strlen(zippedfile) <= 0) || (strlen(filename) <= 0) || (strlen(wname) <= 0))
+		Print "Error in readZipDataIntoWave parameters"
+		return -1
+	endif
+
+	Variable ref
+	ref = ZIPa_openArchive(zippedfile)
+	
+	if (ref <= 0)
+		Print "Error opening archive"
+		return -1
+	endif
+	
+	Variable ret
+	ret = ZIPa_open(ref, filename)
+	
+	if (ret != 0)
+		Print "Error selecting " + filename + " in " + zippedfile
+		return -1
+	endif
+ 
+	// Read in 100 byte chunks from ref to buf,
+	// append to datastream
+	String datastream = ""
+	String buf = ""
+	Do
+		ZIPa_read ref, buf, 100
+		if (V_flag < 0)
+			Print "Error reading data from " + filename + " in " + zippedfile
+			return -1
+		elseif (V_flag == 0)
+			// End of file reached
+			break
+		endif
+		
+		datastream += buf
+	while (1)
+	
+	ZIPa_closeArchive(ref)
+	
+	if (WaveExists(W_stringtowave))
+		KillWaves W_stringtowave
+	endif
+	
+	if (endian != 0)
+		// read in big endian
+		SOCKITstringToWave /E wtype, datastream
+	else
+		// little endian
+		SOCKITstringToWave wtype, datastream
+	endif
+	
+	Duplicate/O W_stringtowave, $wname
+	
+	return 0
+End
+
 
 // Opens JPK force volume file and reads all curves
 // into waves. Also extracts appropriate headers
@@ -604,6 +679,106 @@ Function readFVIntoWaves_JPK(filename)
 	return 0
 
 End
+
+// Reads all curves from a JPK packed force volume file
+// into waves. Also extracts appropriate headers.
+//
+// Streams data directly from the zip file, without extracting
+// to disk first.
+//
+// Parameters:
+// String filename: full path to FV file
+// 
+// Return:
+// 0 if no errors, -1 otherwise
+Function readFVIntoWaves_JPK_stream(filename)
+	String filename			// full path + filename of JPK FV file	
+	
+	Variable result
+	Variable index=0
+	Variable success=0
+	String fcHeaderData, fvHeaderData
+	
+	#ifdef DEBUG
+		Variable timer0 = ticks
+	#endif
+	
+	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
+	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
+	result = KillPreviousWaves()
+	if (result != 0)
+		Print "Error killing previous waves"
+		return -1
+	endif
+
+	
+	result = parseFVHeader_JPK_stream(filename, fvHeaderData)
+	if (result != 0)
+		Print "Error parsing FV header(s)"
+		return -1
+	endif
+	
+	// For all FCs, parse header and read data into waves
+	Variable nMin = str2num(StringByKey("nMin", fvHeaderData))
+	Variable nMax = str2num(StringByKey("nMax", fvHeaderData))
+	String channelPath
+	Variable i
+	Variable rampSize
+	for (i = nMin; i <= nMax; i += 1)
+		// Parse FC header
+		result = parseFCHeader_JPK_stream(filename, i, fcHeaderData)
+		if (result != 0)
+			Print "Error parsing FC header " + num2str(i) + " from " + filename
+			return -1
+		endif
+		
+		// Read height data, save as wave, and use to calculate ramp size
+		channelPath = "index/" + num2str(i) + "/segments/0/channels/"
+		result = readZipDataIntoWave(filename, channelPath + "height.dat", "fc" + num2str(i) + "_x", 2, 1)
+		if (result != 0)
+			Print "Error reading height data index " + num2str(i) + " from " + channelPath
+			return -1
+		endif
+		
+		// Wave name fc<i>_x
+		Wave fcx = $("fc" + num2str(i) + "_x")
+		
+		// convert raw data to nm
+		fcx *= str2num(StringByKey("rampSizeConv", fcHeaderData))
+
+		WaveStats/Q fcx
+		rampSize = V_max - V_min
+		fcHeaderData += "rampSize:" + num2str(rampSize) + ";"
+		
+		
+		// Read vertical deflection data into wave
+		result = readZipDataIntoWave(filename, channelPath + "vDeflection.dat", "fc" + num2str(i), 2, 1)
+		if (result != 0)
+			Print "Error reading vDeflection data index " + num2str(i) + " from " + channelPath
+			return -1
+		endif
+		
+		Wave fc = $("fc" + num2str(i))
+		
+		// check if height wave and vdeflection wave have same number of points
+		if (numpnts(fc) != numpnts(fcx))
+			Print "Error: height and vDeflection data waves have different number of points"
+			Print "in index " + num2str(i) + " of " + channelPath
+			return -1
+		endif
+		
+		Note/K fc, fvHeaderData + fcHeaderData
+		
+	endfor
+	
+	#ifdef DEBUG
+		Print "DEBUG: readFVIntoWaves_JPK time " + num2str((ticks - timer0)/60) + " s"
+	#endif
+	
+	return 0
+
+End
+
 
 
 // Read and parse JPK FV headers given by path.
