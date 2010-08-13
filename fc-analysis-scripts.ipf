@@ -405,7 +405,7 @@ Function readFileIntoWave(filename, wname, headerEnd)
 		line += 1
 		
 		if (strlen(headerEnd) > 0)
-			if (cmpstr(buffer, headerEnd) == 0)
+			if (cmpstr(w[line-1], headerEnd) == 0)
 				break							// End of header reached
 			endif
 		endif
