@@ -348,12 +348,15 @@ Function ParseFCHeader(path, fileName, headerData)
 	return 0	
 End
 
-// Reads a file from String fileName (full path).
-// Add all lines into a new text wave (String wname)
-// String headerEnd indicates up to which part of the file to read
-// (if empty, read full file)
-// Return number of lines read if successful
-// -1 otherwise.
+// Reads a given file line by line into a text wave
+//
+// Parameters:
+// String filename: Full path to file
+// String wname: Name of wave to fill. Does not have to exist; will be overwritten.
+// String headerEnd: Read up to the line given by this string (without line terminator).
+//					  If empty, read whole file
+// Return:
+// Returns number of lines read if successful, -1 otherwise.
 Function readFileIntoWave(filename, wname, headerEnd)
 	String filename, wname, headerEnd
 	
