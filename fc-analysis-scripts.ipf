@@ -1745,7 +1745,7 @@ Function Unziptest()
 	String ls = ZIPa_ls(ref)
 	
 	print "open:"
-	print ZIPa_open(ref, "index/0/segments/0/segment-header.properties")			
+	print ZIPa_open(ref, "index/0/segments/0/channels/height.dat")			
  
 	String buf=""
 	// Read 100 bytes from ref to buf
@@ -1758,7 +1758,8 @@ Function Unziptest()
 	ZIPa_closeArchive(ref)
 
 	Print num2str(V_flag) + " bytes read"
-	Print buf
+	
+	SOCKITstringToWave /E 2, buf
 	return 0
 End
 
