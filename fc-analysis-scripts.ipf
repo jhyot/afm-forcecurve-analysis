@@ -559,13 +559,12 @@ Function Analysis()
 		variable rampSize=numberbykey("rampSize", header)
 		variable VPerLSB=numberbykey("VPerLSB", header)
 		variable springConst=numberbykey("springConst", header)
-		string fileName=stringbykey("fileName", header)
 	
 		if(wavestoanalyse[i])	
 		
 			zres=ticks //DEBUG
 		
-			result = AnalyseBrushHeight(i, brushheight_names, brushheights, rampSize, VPerLSB, springConst, fileName)
+			result = AnalyseBrushHeight(i, brushheight_names, brushheights)
 			
 			usedtimeresult[i]=(ticks-zres)/60 //DEBUG
 			
