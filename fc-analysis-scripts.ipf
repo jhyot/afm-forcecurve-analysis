@@ -1,13 +1,14 @@
 #pragma rtGlobals=1		// Use modern global access method.
+#pragma IndependentModule=ForceMapAnalysis
+#include <SaveGraph>
+#include <Wave Loading>
 
-#define DEBUG
+
+
 
 // **** USER CONFIGURABLE CONSTANTS ****
 //
 // Change constants to adjust procedure behaviour
-
-// Filter for reading force curve files in folder
-static StrConstant ksFilter = ".spm"
 
 // Required version of FC file
 // for now, only tested with 0x07300000)
@@ -18,41 +19,475 @@ static StrConstant ksVersionReq = "0x07300000"
 static Constant ksDataLength = 4096
 
 // FC file type as written in header
-static StrConstant ksFileType = "FOL"
+static StrConstant ksFileType = "FVOL"
 
 // String to be matched (full match, case insensitive) at header end
 static StrConstant ksHeaderEnd = "\\*File list end\r"
+
+Constant kTest = 1234
+ 
 
 //
 // **** END USER CONFIGURABLE CONSTANTS ****
 //
 
+// Create Igor Menu
+Menu "Force Map Analysis"
+	"Load File/1", LoadForceMap()
+	"Choose Force Curves/2", ChooseForceCurves()
+	"Do Analysis/3", Analysis()
+	"Load and Analyse All FC's/4", LoadandAnalyseAll()
+End
 
+function idioticbutton()
 
-// Start FC analysis with empty path
-Function AnalyseFC()
-	AnalyseAllFCInFolder("")
-End Function
+PauseUpdate; Silent 1
+	NewPanel/N=EpicWin/W=(200,100,800,300) as "Epic Win"
+	Button done,pos={300,150},size={50,20},title="Thanks!"
+	Button done,proc=thanks
+	TitleBox tb, title="you are f-ing awsome!!!", pos={250,100},size={0,0},anchor=MC,fsize=40,fstyle=0
 
+end
 
-
-// Analyse all force curves (FC) in a folder
-// Returns 0 on success, -1 on error
-Function AnalyseAllFCInFolder(path)
-	String path			// Symbolic path name
+function thanks(eventcode): ButtonControl
+	Struct WMButtonAction &eventcode
 	
-	Variable totalWaves
-	Variable result
+switch(eventcode.eventCode)
+	case 2:
+	print "ur welcome! ;)"
+	Execute/P/Q/Z "DoWindow/K "+eventcode.win
+	endswitch
+end
 
-	totalWaves = ReadFCFilesIntoWaves(path)
-	Print num2str(totalWaves) + " curves read into waves."
-	if (totalWaves <= 0)
+Function LoadandAnalyseAll()
+
+variable rand=enoise(1)
+print rand
+
+	if(rand<0.1)
+
+		idioticbutton()
+
+	endif
+
+
+
+LoadForceMap()
+
+Variable i
+String/G headerstuff,cw="ws"
+
+make/O/N=1024 $cw
+
+
+
+
+wave temp=$cw
+
+for(i=0;i<1024;i+=1)
+
+	temp[i]=NumberByKey("dataOffset", headerstuff)+ksDataLength*2*2*i
+
+endfor
+
+String/G totalpath
+
+
+ReadAllFCs("temp", totalpath)
+
+
+Analysis()
+
+
+End
+
+Function/S LoadForceMap()
+
+String fileName
+String spath, ending
+String error01="No such file..."
+String/G totalpath
+Variable/G loadcheck=-1
+
+Variable fileref=0
+
+//print kTest
+
+Open/D/R/M="Open Veeco Force Volume Experiment File"/F="All Files:.*;" fileref
+
+if (stringmatch(S_fileName, "")==1)
+print error01
+return error01
+endif
+
+loadcheck=1234
+
+
+SplitString/E=".+\:(.+\.\\d\\d\\d)$" S_fileName, fileName
+SplitString/E=".+(\.\\d\\d\\d)$" S_fileName, ending
+SplitString/E="(.+)\:.+\.\\d\\d\\d$" S_fileName, spath
+
+NewPath/Q/O temp, spath
+
+totalpath=S_fileName
+
+
+//print "FileName: "+fileName
+//print "FileFilter: "+ksFiltertemp
+//print "Symbolic Path "+spathtemp
+//print "Full Path "+S_fileName
+//print "Open File: "+S_fileName
+
+ReadMap("temp", totalpath)
+
+
+End
+
+Function KillPreviousWaves()
+	Variable i = 0
+	String wList,rwList
+	String w, rw
+	
+	wList = WaveList("fc*", ";", "")
+	rwList = WaveList("rfc*", ";", "")
+	
+	do
+		w = StringFromList(i, wList, ";")
+		
+		
+		if ((strlen(w) == 0) || (WaveExists($w) == 0))
+			break
+		endif
+		
+		KillWaves $w
+		i+=1
+
+	while(1)
+	i=0
+	do
+		rw = StringFromList(i, rwList, ";")
+		
+		
+		if ((strlen(rw) == 0) || (WaveExists($rw) == 0))
+			break
+		endif
+		
+		KillWaves $rw
+		i+=1
+	while(1)
+	
+	
+
+
+End
+
+
+Function ReadMap(path, fileName)
+	String path
+	String fileName			// Igor-style path: e.g. "X:Code:igor-analyse-forcecurves:test-files:pegylated_glass.004"
+
+
+	Variable result
+	Variable index=0
+	Variable totalWaves=1024
+	Variable success=0
+	String headerData, image
+	String/G imagewave, imagename
+	
+
+	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
+	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
+	KillPreviousWaves()
+	
+		// Read and parse FC file header
+	result = ParseFCHeader(path, fileName, headerData)
+	
+	if (result == 0)
+	
+	String/G headerstuff=headerData
+	
+	GBLoadWave/Q/B/N=image/T={16,4}/S=(NumberByKey("dataOffset", headerData)-2*totalWaves)/W=1/U=1024 fileName
+	
+	SplitString/E="(.+)\;$" S_waveNames, image
+	imagewave=image
+	
+	redimension/N=(32,32) $imagewave
+	
+	Display/W=(29.25,55.25,450.75,458); AppendImage $imagewave
+	
+	imagename=S_name
+	
+	ModifyImage $imagewave ctab={*,*,Gold,0}
+	
+	DoUpdate
+	
+	endif
+
+End
+
+
+Function ChooseForceCurves()
+
+string/G totalpath, cw="ws"
+variable/G loadcheck
+
+
+
+
+			if (loadcheck==1234)
+			
+				
+			if(waveexists($cw))
+			KillWaves $cw
+			endif
+			Make/N=1024/O $cw
+			
+				ChooseFVs()
+			else
+			print "Load Force Map via \"Force Map Analysis\"->\"Load File\" first!"
+			return 1
+			endif
+
+
+End
+
+Function ChooseFVs()
+string/G imagename
+
+
+	PauseUpdate; Silent 1		// building window...
+	NewPanel/N=Dialog/W=(225,105,525,305) as "Dialog"
+	AutoPositionWindow/M=0/R=$imagename
+	Button done,pos={119,150},size={50,20},title="Done"
+	Button done,proc=DialogDoneButtonProc
+	Button sall, pos={119,100},size={50,20},title="All"
+	Button sall,proc=selectall
+	TitleBox warning,pos={131,83},size={20,20},title=""
+	TitleBox warning,anchor=MC,fColor=(65535,16385,16385)
+
+DoWindow/F $imagename
+SetWindow kwTopWin,hook(choose)= chooser
+
+End
+
+Function selectall(sall) : ButtonControl
+String sall
+
+
+variable i
+String/G headerstuff,cw
+
+
+wave temp=$cw
+
+for(i=0;i<1024;i+=1)
+
+temp[i]=NumberByKey("dataOffset", headerstuff)+ksDataLength*2*2*i
+
+endfor
+
+
+End
+
+
+Function chooser(s)
+STRUCT WMWinHookStruct &s
+Variable rval= 0
+variable mouseloc,xval,yval, xbla,ybla,fcn
+string/G imagename, cw
+String/G headerstuff
+
+
+
+
+switch(s.eventCode)
+case 3:
+yval=s.mouseLoc.v
+xval=s.mouseLoc.h
+
+
+ybla=axisvalfrompixel(imagename,"left",yval-s.winrect.top)
+xbla=axisvalfrompixel(imagename,"bottom",xval-s.winrect.left)
+
+
+Variable xblar =  round(xbla)
+Variable yblar =  round(ybla)
+
+SetDrawEnv xcoord= prel,ycoord=prel, linethick=0, fillfgc=(65280,0,0);DelayUpdate
+DrawRect xblar/32+0.3/32, 1-yblar/32-0.3/32,  xblar/32+0.7/32, 1-yblar/32-0.7/32
+
+
+
+fcn=xblar+(yblar*32)
+
+print "fcn: ",fcn
+
+Variable off=NumberByKey("dataOffset", headerstuff)+ksDataLength*2*fcn*2
+
+wave offset=$cw
+
+print xblar, yblar
+
+if(xblar>=0 && xblar<=31 && yblar>=0 && yblar<=31)
+
+offset[fcn]=off
+
+print "offset read: ",off
+
+else
+
+print "Out of Range! YOU FOOOOOL!"
+endif
+
+rval= 1
+
+EndSwitch
+
+return rval
+
+End
+
+Function DialogDoneButtonProc(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+	
+	string/G imagename, totalpath
+	variable/G loadcheck
+	switch( ba.eventCode )
+		case 2:									// mouse up
+			// turn off the chooser hook
+			SetWindow $imagename,hook(choose)= $""
+			// kill the window AFTER this routine returns
+			Execute/P/Q/Z "DoWindow/K "+ba.win
+			ReadAllFCs("temp", totalpath)
+		endswitch
+	
+	
+	
+
+	return 0
+End
+
+
+
+Function ReadAllFCs(path, fileName)
+	String path
+	String fileName			// Igor-style path: e.g. "X:Code:igor-analyse-forcecurves:test-files:pegylated_glass.004"
+	
+	Variable result
+	Variable index=0
+	Variable totalWaves=1024
+	Variable success=0
+	String/G headerstuff, imagewave, imagename,cw
+	string temp,temp1,temp2
+	string temp02,temp12,temp22 //RETRACT
+
+	
+	DoWindow/F $imagename // Bring graph to front
+	if (V_Flag == 0)									// Verify that graph exists
+		Abort "UserCursorAdjust: No such graph."
 		return -1
 	endif
 	
-	// Create 2 waves
+	
+	//progress bar
+	
+//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
+//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
+//	ValDisplay valdisp0,value= _NUM:0
+//	ValDisplay valdisp0,highColor=(0,65535,0)
+	//Button bStop,pos={375,32},size={50,20},title="Stop"
+//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
+
+	
+	variable t0=ticks
+	
+	wave dataOffsets=$cw
+	
+	
+	// read all FCs in file
+	do												
+			// Load actual data into new wave
+			// Waves are called fc0, fc1, etc.
+			
+		if(dataOffsets[index])
+			
+				GBLoadWave/A=fc/B/Q/S=(dataOffsets[index])/T={16,4}/U=(ksDataLength)/W=1 fileName
+			
+				temp="fc"+num2str(index)
+				
+								
+				SplitString/E="(.+)\;$" S_waveNames, temp1
+				SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
+				
+				
+	
+				
+				
+				if(index!=str2num(temp2))
+				
+				
+				duplicate/O $temp1 $temp; KillWaves $temp1
+				endif
+				
+				if (V_flag == 1)
+					// Increment number of successfully read files
+					headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
+					Note/K $temp, headerstuff
+					
+					success += 1
+				else
+					Print fileName + ": less or more than 1 curve read from file"
+				endif
+		endif
+		
+		if(dataOffsets[index])  //RETRACT
+		
+			
+
+				GBLoadWave/A=rfc/B/Q/S=(dataOffsets[index]+(2*ksDataLength))/T={16,4}/U=(ksDataLength)/W=1 fileName  //RETRACT
+			
+
+				temp02="rfc"+num2str(index)
+				
+				SplitString/E="(.+)\;$" S_waveNames, temp1
+				SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
+				
+				if(index!=str2num(temp2))
+
+				duplicate/O $temp1 $temp02; KillWaves $temp1		//RETRACT
+				endif
+				
+				if (V_flag == 1)
+					//Increment number of successfully read files
+					headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
+					Note/K $temp02, headerstuff
+					
+					success += 1
+				else
+					Print fileName + ": less or more than 1 curve read from file"
+				endif
+		endif
+		
+		
+
+		index += 1
+		
+		Prog("ReadWaves",index,totalWaves)
+		
+//		ValDisplay valdisp0,value= _NUM:index+1,win=ProgressPanel
+//		DoUpdate /W=ProgressPanel
+		if( V_Flag == 2 )	// we only have one button and that means stop
+			break
+		endif
+		
+	while (index<totalWaves)
+	
+	//KillWindow ProgressPanel
+	printf "Elapsed time was %g seconds\r",(ticks-t0)/60
+
+// Create 2 waves
 	// One holds file and wave names, the other the corresponding brush heights
-	// Values will be filled in in AnalyseBrushHeight
+	// Value will be filled in in AnalyseBrushHeight
 	// Old waves will be overwritten
 	if (WaveExists(brushheight_names))
 		KillWaves brushheight_names
@@ -60,100 +495,312 @@ Function AnalyseAllFCInFolder(path)
 	if (WaveExists(brushheights))
 		KillWaves brushheights
 	endif
+	if (WaveExists(retractfeature))
+		KillWaves retractfeature
+	endif
 	Make/T/O/N=(totalWaves, 2) brushheight_names
 	Make/O/N=(totalWaves) brushheights
-	
-	Variable i
-	for (i=0; i < totalWaves; i+=1)
-		result = AnalyseBrushHeight(i, brushheight_names, brushheights)
-	endfor
-	
-	ReviewCurves("brushheight_names", "brushheights")
-	
-	return 0
-End
+	Make/O/N=(totalWaves) retractfeature
 
-// Loop through all files in path with file filter ksFilter and read the data into individual waves
-// Returns number of files that were read successfully
-Function ReadFCFilesIntoWaves(path)
-	String path			// Symbolic path name
-	
-	if (strlen(path)==0)				// If no path specified, create one
-		NewPath/O temporaryPath			// This will put up a dialog
-		if (V_flag != 0)
-			return -1						// User cancelled
-		endif
-		path = "temporaryPath"
-	endif
-	
-	
-	String fileName
-	Variable result
-	Variable index=0
-	Variable success=0
-	String headerData
-	
-	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
-	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
-	KillPreviousWaves()
 
-	
-	// Loop through each file in folder
-	do											
-		fileName = IndexedFile($path, index, ksFilter)
-		if (strlen(fileName) == 0)					
-			break			// No more files
-		endif
-		// Read and parse FC file header
-		result = ParseFCHeader(path, fileName, headerData)
-		if (result == 0)	
-			// Load actual data into new wave
-			// Waves are called fc0, fc1, etc.
-			GBLoadWave/A=fc/B=1/P=$path/S=(NumberByKey("dataOffset", headerData))/T={16,4}/U=(ksDataLength)/W=1 fileName
-			if (V_flag == 1)
-				// Increment number of successfully read files
-				headerData += "fileName:" + fileName + ";"
-				Note/K $(StringFromList(0, S_waveNames)), headerData
-				success += 1
-			else
-				Print fileName + ": less or more than 1 curve read from file"
-			endif
-		endif
-		index += 1
-	while (1)
-
-	if (Exists("temporaryPath"))				// Kill temp path if it exists
-		KillPath temporaryPath
-	endif
-
-	return success							// Return number of successfully read FC files
+return success	
 End
 
 
-// Kills all waves in the current data folder starting with fc
+
+
+Function Analysis()
+
+// Analyse all force curves (FC) in a folder
 // Returns 0 on success, -1 on error
-Function KillPreviousWaves()
-	Variable i = 0
-	String wList
-	String w
+	String path,wavei			// Symbolic path name
 	
-	wList = WaveList("fc*", ";", "")
+	Variable totalWaves=1024
+	Variable result=-1
 	
-	do
-		w = StringFromList(i, wList, ";")
-		if ((strlen(w) == 0) || (WaveExists($w) == 0))
-			return 0
+	Variable i, t0=ticks
+	
+	String/G cw
+	
+	wave brushheights
+	wave retractfeature
+
+	
+	wave wavestoanalyse=$cw
+	
+//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
+//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
+//	ValDisplay valdisp0,value= _NUM:0
+//	ValDisplay valdisp0, mode= 3
+//	ValDisplay valdisp0,highColor=(0,65535,0)
+	//Button bStop,pos={375,32},size={50,20},title="Stop"
+//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
+	
+
+	make/N=(totalWaves)/O usedtime //DEBUG
+	make/N=(totalWaves)/O usedtimeresult //DEBUG
+	variable zres
+	make/N=1024/O usedtimefeature  //DEBUG
+	variable zfeat
+	
+	
+	string header
+	
+	for (i=0; i < totalWaves; i+=1)
+	
+		variable z0=ticks		//DEBUG
+		
+		string tempw="fc"+num2str(i)
+		
+		WAVE w=$tempw
+		
+		header = note(w)
+		
+		variable rampSize=numberbykey("rampSize", header)
+		variable VPerLSB=numberbykey("VPerLSB", header)
+		variable springConst=numberbykey("springConst", header)
+		string fileName=stringbykey("fileName", header)
+	
+		if(wavestoanalyse[i])	
+		
+			zres=ticks //DEBUG
+		
+			result = AnalyseBrushHeight(i, brushheight_names, brushheights, rampSize, VPerLSB, springConst, fileName)
+			
+			usedtimeresult[i]=(ticks-zres)/60 //DEBUG
+			
+			zfeat=ticks	//DEBUG
+			
+			
+			
+			retractfeature[i]=retractedforcecurvebaselinefit(i, rampSize, VPerLSB, springConst)	//baselinefit for the retracted curves.
+			
+			usedtimefeature[i]=(ticks-zfeat)/60	//DEBUG
+		
+			if(result==-1) //could not find start/endpoint of fit or could not fit
+				brushheights[i]=-1 //put some out-of-range number for brushheight (for better visualization in result-graph)
+			endif
+
 		endif
 		
-		try
-			KillWaves $w; AbortOnRTE
-		catch
-			Print "Error in KillWaves. fc* waves in use? Errcode " + num2str(GetRTError(1))
-			return -1
-		endtry
-		i += 1
-	while(1)
+	Prog("Analysis",i,totalWaves)
+	
+		
+//	ValDisplay valdisp0,value= _NUM:i+1,win=ProgressPanel
+//	DoUpdate /W=ProgressPanel
+
+	usedtime[i]= (ticks-z0)/60  //DEBUG
+	
+	
+		
+	endfor
+	
+//	DoWindow/K ProgressPanel
+	
+
+	
+	printf "Elapsed time was %g seconds\r",(ticks-t0)/60
+	
+	variable bla=0
+	
+	for (i=0; i < totalWaves; i+=1)
+	
+		if(wavestoanalyse[i])	
+		bla+=1
+		endif
+		
+	endfor
+	
+	if(waveexists(brushheights2))
+	KillWaves brushheights2
+	endif
+	Make/N=(bla)/O brushheights2
+	
+	bla=0
+	wave brushheights
+	for (i=0; i < totalWaves; i+=1)
+	
+		if(wavestoanalyse[i])	
+		bla+=1
+		brushheights2[bla-1]=brushheights[i]
+		endif
+		
+	endfor
+	
+
+	
+	
+	if (result==0)
+//	ReviewCurves("brushheight_names", "brushheights")
+	endif
+	
+	
+	string heights="heightsmap", temp="tempwave"
+	
+	if(waveexists(heights))
+	killwaves $heights
+	endif
+	make/N=1024/O $heights
+	wave urstheights=$heights
+	
+	if(waveexists(temp))
+	killwaves $temp
+	endif
+	make/N=1024/O $temp
+	wave urst=$temp
+	
+	duplicate/O brushheights urstheights
+	duplicate/O brushheights $temp
+	
+	wavestats urstheights
+	variable maxheight=V_max
+	
+	for (i=0; i < totalWaves; i+=1)
+	
+		if(urst[i]==-1)	
+		urstheights[i]=1e6
+		endif
+		
+	endfor
+	
+	
+	
+	redimension/N=(32,32) retractfeature
+	
+	Display/W=(29.25+450.75+400,55.25,450.75+450.75+400,458); AppendImage retractfeature 
+	DoWindow/C retractfeaturesdetection
+	ModifyImage retractfeature explicit=1,eval={0,46592,51712,63488},eval={-1,0,0,0},eval={1,65535,65535,65535}
+		
+	redimension/N=(32,32) urstheights
+
+	
+	Display/W=(29.25+450.75,55.25,450.75+450.75,458); AppendImage $heights
+	DoWindow/C results
+	
+	
+	ModifyImage $heights ctab={V_min+1+1e-3,V_max,Gold,0}, minRGB=(46592,51712,63488), maxRGB=(63488,0,0)
+	
+	
+	
+	DoWindow/F results
+	ColorScale/C/N=text0/F=0/A=RC/E image=heightsmap
+	ModifyGraph width=300, height=300
+	
+	DoUpdate
+	SetWindow kwTopWin,hook(inspect)= inspector
+	
+	
+	DoWindow/F retractfeaturesdetection
+	SetWindow kwTopWin,hook(inspect)=rinspector
+	DoUpdate
+	
+	
+	
+	return 0
+
 End
+
+Function rinspector(s)			//retractfeature
+STRUCT WMWinHookStruct &s
+Variable rval= 0
+variable mouseloc,xval,yval, xbla,ybla
+string/G cw
+
+
+switch(s.eventCode)
+case 3:
+yval=s.mouseLoc.v
+xval=s.mouseLoc.h
+
+
+ybla=round(axisvalfrompixel("retractfeaturesdetection","left",yval-s.winrect.top))
+xbla=round(axisvalfrompixel("retractfeaturesdetection","bottom",xval-s.winrect.left))
+
+
+wave curvestoanalyse=$cw
+
+
+if(xbla>=0 && xbla<=31 && ybla>=0 && ybla<=31 && curvestoanalyse[xbla+(ybla*32)])
+
+rplot2(abs(xbla+(ybla*32)))
+
+
+print "FCNumber:",xbla+(ybla*32)
+print "X:",xbla,"Y:",ybla
+//print "Brushheight for selection:",brushheights[xbla+(ybla*32)],"nm"
+
+else
+
+print "No Data here!"
+
+endif
+
+
+
+EndSwitch
+
+return rval
+
+End
+
+
+
+Function inspector(s)			//heightsmap
+STRUCT WMWinHookStruct &s
+Variable rval= 0
+variable mouseloc,xval,yval, xbla,ybla
+string/G cw
+
+
+switch(s.eventCode)
+case 3:
+yval=s.mouseLoc.v
+xval=s.mouseLoc.h
+
+
+ybla=round(axisvalfrompixel("results","left",yval-s.winrect.top))
+xbla=round(axisvalfrompixel("results","bottom",xval-s.winrect.left))
+
+
+wave curvestoanalyse=$cw
+wave brushheights
+
+
+if(xbla>=0 && xbla<=31 && ybla>=0 && ybla<=31 && curvestoanalyse[xbla+(ybla*32)])
+
+plot4(abs(xbla+(ybla*32)))
+
+print "FCNumber:",xbla+(ybla*32)
+print "X:",xbla,"Y:",ybla
+print "Brushheight for selection:",brushheights[xbla+(ybla*32)],"nm"
+
+else
+
+print "No Data here!"
+
+endif
+
+
+
+EndSwitch
+
+return rval
+
+End
+
+
+
+
+
+
+
+
+
+
+//
+// Kills all waves in the current data folder starting with fc
+// Returns 0 on success
+
 
 // Read and parse FC file given by path and fileName
 // Write relevant info about FC into String headerData (pass by ref)
@@ -173,11 +820,10 @@ Function ParseFCHeader(path, fileName, headerData)
 	Variable result, subGroupOffset
 	headerData = ""
 	
-	PathInfo path
-	String pathString = S_path
-	result = readFileIntoWave(S_path + filename, "fullHeader", ksHeaderEnd)
-	if (result <= 0)
-		Print fileName + ": Couldn't read header\r"
+	
+	result = ReadFCHeaderLines(path, fileName)
+	if (result != 0)
+		Print fileName + ": Did not find header end\r"
 		return -1
 	endif
 	
@@ -233,8 +879,17 @@ Function ParseFCHeader(path, fileName, headerData)
 		return -1
 	endif
 	
-	// Get data offset
-	FindValue/S=(subGroupOffset)/TEXT="\\Data length:" fullHeader
+	
+	// Check if correct number of points
+	FindValue/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		Print filename + ": \\*Ciao force image list not found"
+		return -1
+	endif
+	subGroupOffset = W_Index[V_value]
+	
+		// Get data offset
+	FindValue/S=(subGroupOffset)/TEXT="\Data offset:" fullHeader
 	if (V_value < 0)
 		Print filename + ": Data offset not found"
 		return -1
@@ -245,14 +900,6 @@ Function ParseFCHeader(path, fileName, headerData)
 		return -1
 	endif
 	headerData += "dataOffset:" + s + ";"
-	
-	// Check if correct number of points
-	FindValue/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
-	if (V_value < 0)
-		Print filename + ": \\*Ciao force image list not found"
-		return -1
-	endif
-	subGroupOffset = W_Index[V_value]
 	
 	FindValue/S=(subGroupOffset)/TEXT="\\Samps/line:" fullHeader
 	if (V_value < 0)
@@ -348,33 +995,28 @@ Function ParseFCHeader(path, fileName, headerData)
 	return 0	
 End
 
-// Reads a given file line by line into a text wave
-//
-// Parameters:
-// String filename: Full path to file
-// String wname: Name of wave to fill. Does not have to exist; will be overwritten.
-// String headerEnd: Read up to the line given by this string (without line terminator).
-//					  If empty, read whole file
-// Return:
-// Returns number of lines read if successful, -1 otherwise.
-Function readFileIntoWave(filename, wname, headerEnd)
-	String filename, wname, headerEnd
+// Read FC file given by path and fileName.
+// Add all lines into a new text wave (fullHeader)
+// return 0 if end of header found (defined by ksHeaderEnd)
+// -1 otherwise.
+// Last line of header not included in fullHeader.
+// CR (\r) is at end of each line in the wave.
+Function ReadFCHeaderLines(path, fileName)
+	String path, fileName
 	
-	if ((strlen(filename) == 0) || (strlen(wname) == 0))
+	Variable result = -1			// Set to 0 if end of header found
+	
+	if ((strlen(path) == 0) || (strlen(fileName) == 0))
 		return -1
-	endif	
-	
-	
-	// Read line by line until header end or file end reached
+	endif
 	
 	Variable refNum
-	Open/R refNum as fileName		
+	Open/R/P=$path refNum as fileName				
 	if (refNum == 0)	
 		return -1						// Error
 	endif
 
-	Make/T/O/N=0 $wname		// Make new text wave, overwrite old if needed
-	WAVE/T w = $wname
+	Make/T/O/N=0 fullHeader		// Make new text wave, overwrite old if needed
 	
 	Variable len
 	String buffer
@@ -385,967 +1027,177 @@ Function readFileIntoWave(filename, wname, headerEnd)
 		
 		len = strlen(buffer)
 		if (len == 0)
-			if (strlen(headerEnd) > 0)
-				// Header end was specified but not found, return error
-				line = -1
-				break
-			else
-				// Correctly reached file end
-				break
-			endif
+			break										// No more lines to be read
 		endif
 		
-		Redimension/N=(line+1) w		// Add one more row to wave
-		// If line terminator (always \r, see FReadLine help) at end of line, remove it
-		if (cmpstr(buffer[len-1], "\r") == 0)
-			len -= 1
+		if (cmpstr(buffer, ksHeaderEnd) == 0)
+			result = 0								// End of header reached
+			break
 		endif
-		w[line] = buffer[0,len-1]
+		
+		Redimension/N=(line+1) fullHeader		// Add one more row to wave
+		fullHeader[line] = buffer[0,len-2]		// Add line to wave, omit trailing CR char
 
 		line += 1
-		
-		if (strlen(headerEnd) > 0)
-			if (cmpstr(w[line-1], headerEnd) == 0)
-				break							// End of header reached
-			endif
-		endif
 	while (1)
 
 	Close refNum
-	return line
+	return result
 End
 
 
-// Splits a given string by line terminators and adds them to a text wave
-// line by line.
-//
-// Parameters:
-// String str: String to parse
-// String wname: Name of wave to fill. Does not have to exist; will be overwritten.
-// String headerEnd: Read up to the line given by this string (without line terminator).
-//					  If empty, add whole string
-// Return:
-// Returns number of lines read if successful, -1 otherwise.
-// -1 is also returned if headerEnd was specified but not found in the string
-Function readStringIntoWave(str, wname, headerEnd)
-	String str, wname, headerEnd
-	
-	if ((strlen(str) == 0) || (strlen(wname) == 0))
-		return -1
-	endif	
-	
-	// Normalize line terminators to \r
-	str = ReplaceString("\r\n", str, "\r")
-	str = ReplaceString("\n", str, "\r")
 
+Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
+Variable index, rampSize, VPerLSB, springConst
 
-	Make/T/O/N=0 $wname		// Make new text wave, overwrite old if needed
-	WAVE/T w = $wname
+Variable/G V_fitoptions=4 //no fit window
+
+String wnametemp = "fc" + num2str(index)		
+WAVE w = $wnametemp
+String header = note(w)
+
+String wname= "rfc" + num2str(index)
+WAVE rw=$wname
+
 	
-	Variable line = 0 // number of lines read
-	Variable p = 0 // pointer to current position in string
-	Variable lineEnd
+	make/N=1024/O timer1
+	Variable tic1
+	make/N=1024/O timer2
+	Variable tic2
+	make/N=1024/O timer3
+	Variable tic3
+	make/N=1024/O timer4
+	Variable tic4
 	
-	do
-		Redimension/N=(line+1) w		// Add one more row to wave
+	
+	
+	// Set Z piezo ramp size (x axis)
+	SetScale/I x 0, rampSize, "nm", rw
+	
+	tic1=ticks
+	// Convert y axis to V
+	rw *= VPerLSB
+	
+	timer1[index]=(ticks-tic1)/60
+	
+	tic2=ticks
+	
+	// Fit baseline and subtract from curve
+	CurveFit/NTHR=1/Q line  rw[2600,3600]
+	WAVE W_coef
+	Make/N=(ksDataLength) $(wname + "_blfit")
+	WAVE blfit = $(wname + "_blfit")
+	SetScale/I x 0, rampSize, "nm", blfit
+	// Save baseline to fc<i>_blfit
+	blfit = W_coef[0] + W_coef[1]*x
+	// Subtr. baseline
+	rw -= (W_coef[0] + W_coef[1]*x)
+	
+	// Sometimes last points of curve are at smallest LSB value
+	// Set those to 0 (i.e. if value < -3 V)
+	rw[3600,] = (rw[p] > -3) * rw[p]
+	
+	timer2[index]=(ticks-tic2)/60
+
+	tic3=ticks
+	// Fit deflection sensitivity and change y scale
+	CurveFit/NTHR=1/Q line  rw[10,100]
+	Make/N=(ksDataLength/8) $(wname + "_sensfit")	// display only 4096/8 points
+	WAVE sensfit = $(wname + "_sensfit")
+	SetScale/I x 0, (rampSize/8), "nm", sensfit
+	// Save fit to fc<i>_sensfit
+	sensfit = W_coef[0] + W_coef[1]*x
+	Variable deflSens = -1/W_coef[1]
+	// Add fitted sens. to header data
+	header += "deflSensFit:" + num2str(deflSens) + ";"
+	//Note/K w, header
+	// Change y scale on all curves to nm
+	rw *= deflSens
+	blfit *= deflSens
+	sensfit *= deflSens
+	
+	timer3[index]=(ticks-tic3)/60
+	
+	tic4=ticks
+	
+	// Create x values wave for tip-sample-distance
+	Make/N=(ksDataLength) $(wname + "_x_tsd")
+	WAVE xTSD = $(wname + "_x_tsd")
+	
+	timer4[index]=(ticks-tic4)/60
+	
+	// Write displacement x values
+	xTSD = rampSize/ksDataLength * p
+	// Subtract deflection to get tip-sample-distance
+	xTSD += rw
+	
+	
+
+	
+	// Change y scale on all curves to pN
+	Variable sc = springConst
+	rw *= sc * 1000
+	blfit *= sc * 1000
+	sensfit *= sc * 1000
+	SetScale d 0,0,"pN", rw, blfit, sensfit
+	
+	// Shift hard wall contact point to 0 in xTSD
+	WaveStats/R=[10,100]/Q xTSD
+	xTSD -= V_avg
+	
+
+	//retractcurve feature detection 
+	
+	Variable detectsetpnt=-30	//Set your lower limit of noise (nm). Values smaller than this value are interpreted as a retract feature.
+	Variable maxpnt=numpnts(rw)-1,minpnt
+	
+ 
+	
+	wavestats/Q/R=[0,maxpnt] rw
+	
+	minpnt = x2pnt(rw,V_minloc)
+	
+	
+
+	if(V_min<detectsetpnt)
+	
 		
-		lineEnd = strsearch(str, "\r", p)
+		//print detectsetpnt, V_min, rw[minpnt], rw[minpnt-1], rw[minpnt+1]
 
-		line += 1
-
-		if (lineEnd < 0)
-			// last line without terminator? read all and exit loop
-			w[line-1] = str[p, strlen(str)-1]
+		
+		if(rw[minpnt-1]<detectsetpnt && rw[minpnt+1]<detectsetpnt)
 			
-			if (strlen(headerEnd) > 0)
-				if (cmpstr(headerEnd, w[line-1]) != 0)
-					// Is last line, but not header end, return error
-					line = -1
-				endif
-			endif
-
-			break
+		return 1
+		
 		else
-			// read line w/o terminator and move pointer
-			w[line] = str[p, lineEnd-1]
-			p = lineEnd + 1
+		
+			do
+		
+				wavestats/Q/R=[0,minpnt-1] rw
+				
+				//print "do",minpnt, V_min, V_minloc
+		
+				minpnt = x2pnt(rw,V_minloc)
+			
+				if(rw[minpnt-1]<detectsetpnt && rw[minpnt+1]<detectsetpnt)
+	
+					return 1
+			
+				endif
+		
+			while(V_minloc>5)	//when no feature below x=5nm then exit with -1
+			
+			return -1
+	
 		endif
-		
-		
-		if (p >= strlen(str))
-			// was last line
-			break
-		endif
-		
-	while (1)
-
-	return line
+	
+	
+	
+	endif
+	
+	return -1
+	
 End
-
-// Read data from a file in a zip archive directly into a wave,
-// converting to desired data type at the same time.
-//
-// Parameters:
-// String zippedfile: Full path to zip file on the filesystem
-// String filename: Path to file to be read within the archive, in POSIX format ("/")
-// String wname: Wave name where to write data. Does not need to exist, will be overwritten
-// Integer wtype: Type of data, as in WaveType:
-//				  2 = 32bit float, 4 = 64bit double, 8 = 8bit int, 16 = 16bit int, 32 = 32bit int
-//				  complex numbers and unsigned int als possible, see WaveType help
-// Integer endian: 0 for little endian, 1 for big endian
-//
-// Return:
-// Returns 0 if successful, -1 otherwise
-Function readZipDataIntoWave(zippedfile, filename, wname, wtype, endian)
-	String zippedfile, filename, wname
-	Variable wtype, endian
-	
-	if ((strlen(zippedfile) <= 0) || (strlen(filename) <= 0) || (strlen(wname) <= 0))
-		Print "Error in readZipDataIntoWave parameters"
-		return -1
-	endif
-
-	Variable ref
-	ref = ZIPa_openArchive(zippedfile)
-	
-	if (ref <= 0)
-		Print "Error opening archive"
-		return -1
-	endif
-	
-	Variable ret
-	ret = ZIPa_open(ref, filename)
-	
-	if (ret != 0)
-		Print "Error selecting " + filename + " in " + zippedfile
-		return -1
-	endif
- 
-	// Read in 100 byte chunks from ref to buf,
-	// append to datastream
-	String datastream = ""
-	String buf = ""
-	Do
-		ZIPa_read ref, buf, 100
-		if (V_flag < 0)
-			Print "Error reading data from " + filename + " in " + zippedfile
-			return -1
-		elseif (V_flag == 0)
-			// End of file reached
-			break
-		endif
-		
-		datastream += buf
-	while (1)
-	
-	ZIPa_closeArchive(ref)
-	
-	if (WaveExists(W_stringtowave))
-		KillWaves W_stringtowave
-	endif
-	
-	if (endian != 0)
-		// read in big endian
-		SOCKITstringToWave /E wtype, datastream
-	else
-		// little endian
-		SOCKITstringToWave wtype, datastream
-	endif
-	
-	Duplicate/O W_stringtowave, $wname
-	
-	return 0
-End
-
-
-// Opens JPK force volume file and reads all curves
-// into waves. Also extracts appropriate headers
-//
-// Parameters:
-// String filename: full path to FV file
-// 
-// Return:
-// 0 if no errors, -1 otherwise
-Function readFVIntoWaves_JPK(filename)
-	String filename			// full path + filename of JPK FV file	
-	
-	Variable result
-	Variable index=0
-	Variable success=0
-	String fcHeaderData, fvHeaderData
-	
-	#ifdef DEBUG
-		Variable timer0 = ticks
-	#endif
-	
-	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
-	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
-	result = KillPreviousWaves()
-	if (result != 0)
-		Print "Error killing previous waves"
-		return -1
-	endif
-
-	// Get temp path from OS
-	String tempPath = SpecialDirPath("Temporary", 0, 0, 0)
-	
-	// Create subfolder in temp path
-	String unzipPath = tempPath+"jpkunzip"
-	NewPath/Q/O/C tempPathSym, unzipPath
-	
-	Print "Unzipping FV file..."
-	
-	#ifdef DEBUG
-		Variable timer1 = ticks
-	#endif
-		
-	// Unzip file to temporary location
-	// Needs ZIP XOP for this
-	ZIPfile/O/X unzipPath, filename
-	
-	Print "Unzipping done."
-	
-	#ifdef DEBUG
-		Print "DEBUG: ZIPfile time " + num2str((ticks - timer1)/60) + " s"
-	#endif
-	
-	
-	result = parseFVHeader_JPK(unzipPath, fvHeaderData)
-	if (result != 0)
-		Print "Error parsing FV header(s)"
-		return -1
-	endif
-	
-	// For all FCs, parse header and read data into waves
-	Variable nMin = str2num(StringByKey("nMin", fvHeaderData))
-	Variable nMax = str2num(StringByKey("nMax", fvHeaderData))
-	String channelPath
-	Variable i
-	Variable rampSize
-	for (i = nMin; i <= nMax; i += 1)
-		// Parse FC header
-		result = parseFCHeader_JPK(unzipPath, i, fcHeaderData)
-		if (result != 0)
-			Print "Error parsing FC header " + num2str(i) + " from " + unzipPath
-			return -1
-		endif
-		
-		// Read height data, save as wave, and use to calculate ramp size
-		channelPath = unzipPath + ":index:" + num2str(i) + ":segments:0:channels:"
-		GBLoadWave/N=wtemp/Q/T={2,4} (channelPath + "height.dat")
-		if (V_flag != 1)
-			Print "Error reading height data index " + num2str(i) + " from " + channelPath
-			return -1
-		endif
-		
-		WAVE wtemp0
-		
-		// convert raw data to nm
-		wtemp0 *= str2num(StringByKey("rampSizeConv", fcHeaderData))
-
-		WaveStats/Q wtemp0
-		rampSize = V_max - V_min
-		fcHeaderData += "rampSize:" + num2str(rampSize) + ";"
-		
-		// Final wave name fc<i>_x
-		Duplicate/O wtemp0, $("fc" + num2str(i) + "_x")
-		
-		
-		// Read vertical deflection data into wave
-		GBLoadWave/N=wtemp/Q/T={2,4} (channelPath + "vDeflection.dat")
-		if (V_flag != 1)
-			Print "Error reading height data index " + num2str(i) + " from " + channelPath
-			return -1
-		endif
-		
-		// check if height wave and vdeflection wave have same number of points
-		if (numpnts(wtemp0) != numpnts($("fc" + num2str(i) + "_x")))
-			Print "Error: height and vDeflection data waves have different number of points"
-			Print "in index " + num2str(i) + " of " + channelPath
-			return -1
-		endif
-		
-		Duplicate/O wtemp0, $("fc" + num2str(i))
-		Note/K $("fc" + num2str(i)), fvHeaderData + fcHeaderData
-		
-	endfor
-	
-	KillPath tempPathSym
-	
-	#ifdef DEBUG
-		Print "DEBUG: readFVIntoWaves_JPK time " + num2str((ticks - timer0)/60) + " s"
-	#endif
-	
-	return 0
-
-End
-
-// Reads all curves from a JPK packed force volume file
-// into waves. Also extracts appropriate headers.
-//
-// Streams data directly from the zip file, without extracting
-// to disk first.
-//
-// Parameters:
-// String filename: full path to FV file
-// 
-// Return:
-// 0 if no errors, -1 otherwise
-Function readFVIntoWaves_JPK_stream(filename)
-	String filename			// full path + filename of JPK FV file	
-	
-	Variable result
-	Variable index=0
-	Variable success=0
-	String fcHeaderData, fvHeaderData
-	
-	#ifdef DEBUG
-		Variable timer0 = ticks
-	#endif
-	
-	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
-	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
-	result = KillPreviousWaves()
-	if (result != 0)
-		Print "Error killing previous waves"
-		return -1
-	endif
-
-	
-	result = parseFVHeader_JPK_stream(filename, fvHeaderData)
-	if (result != 0)
-		Print "Error parsing FV header(s)"
-		return -1
-	endif
-	
-	// For all FCs, parse header and read data into waves
-	Variable nMin = str2num(StringByKey("nMin", fvHeaderData))
-	Variable nMax = str2num(StringByKey("nMax", fvHeaderData))
-	String channelPath
-	Variable i
-	Variable rampSize
-	for (i = nMin; i <= nMax; i += 1)
-		// Parse FC header
-		result = parseFCHeader_JPK_stream(filename, i, fcHeaderData)
-		if (result != 0)
-			Print "Error parsing FC header " + num2str(i) + " from " + filename
-			return -1
-		endif
-		
-		// Read height data, save as wave, and use to calculate ramp size
-		channelPath = "index/" + num2str(i) + "/segments/0/channels/"
-		result = readZipDataIntoWave(filename, channelPath + "height.dat", "fc" + num2str(i) + "_x", 2, 1)
-		if (result != 0)
-			Print "Error reading height data index " + num2str(i) + " from " + channelPath
-			return -1
-		endif
-		
-		// Wave name fc<i>_x
-		Wave fcx = $("fc" + num2str(i) + "_x")
-		
-		// convert raw data to nm
-		fcx *= str2num(StringByKey("rampSizeConv", fcHeaderData))
-
-		WaveStats/Q fcx
-		rampSize = V_max - V_min
-		fcHeaderData += "rampSize:" + num2str(rampSize) + ";"
-		
-		
-		// Read vertical deflection data into wave
-		result = readZipDataIntoWave(filename, channelPath + "vDeflection.dat", "fc" + num2str(i), 2, 1)
-		if (result != 0)
-			Print "Error reading vDeflection data index " + num2str(i) + " from " + channelPath
-			return -1
-		endif
-		
-		Wave fc = $("fc" + num2str(i))
-		
-		// check if height wave and vdeflection wave have same number of points
-		if (numpnts(fc) != numpnts(fcx))
-			Print "Error: height and vDeflection data waves have different number of points"
-			Print "in index " + num2str(i) + " of " + channelPath
-			return -1
-		endif
-		
-		Note/K fc, fvHeaderData + fcHeaderData
-		
-	endfor
-	
-	#ifdef DEBUG
-		Print "DEBUG: readFVIntoWaves_JPK time " + num2str((ticks - timer0)/60) + " s"
-	#endif
-	
-	return 0
-
-End
-
-
-
-// Read and parse JPK FV headers given by path.
-//
-// Parameters:
-// String path: path to force volume data root
-// String &fvHeaderData: String to store header data in (pass by ref)
-// 
-// Return:
-// 0 if no errors, -1 otherwise
-//
-// fvHeaderData is in "key1:value1;key2:value2;" format
-// keys:
-// nMin				First FC index
-// nMax				Last FC index
-// iLength			Grid size in i direction
-// jLength			Grid size in j direction
-Function parseFVHeader_JPK(path, fvHeaderData)
-	String path
-	String &fvHeaderData
-	
-	Variable result
-	fvHeaderData = ""
-	
-	if (stringmatch(path, "*:") == 0)
-		path += ":"
-	endif
-
-	
-	// ===============================
-	// Extract relevant FV header data
-	// ===============================
-	
-	// Read force volume header lines into a wave
-	result = readFileIntoWave(path + "header.properties", "fvHeader", "")
-	if (result <= 0)
-		Print "Could not read FV header"
-		return -1
-	endif
-
-
-	WAVE/T fvHeader
-	
-	
-	// Check if correct filetype and version
-	String fvFileTypeReq = "spm-force-scan-map-file"
-	String fvVersionReq = "0.6"
-	String s
-	
-	FindValue/TEXT="jpk-data-file=" fvHeader
-	if (V_value < 0)
-		Print "Filetype not found"
-		return -1
-	endif
-	SplitString/E="^jpk-data-file=(.+?)\\s*$" fvHeader[V_value], s
-	if (cmpstr(s, fvFileTypeReq) != 0)
-		Print "Wrong filetype (non-FV file)"
-		return -1
-	endif
-	
-	FindValue/TEXT="file-format-version=" fvHeader
-	if (V_value < 0)
-		Print "File version not found"
-		return -1
-	endif
-	SplitString/E="^file-format-version=(.+?)\\s*$" fvHeader[V_value], s
-	if (cmpstr(s, fvVersionReq) != 0)
-		Print "Wrong FV file version"
-		return -1
-	endif
-	
-
-	// Get number of force curves
-	Variable nMin, nMax
-	FindValue/TEXT="force-scan-map.indexes.min=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.indexes.min not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.indexes.min=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.indexes.min invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "nMin:" + s + ";"
-		nMin = str2num(s)
-	endif
-	
-	FindValue/TEXT="force-scan-map.indexes.max=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.indexes.max not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.indexes.max=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.indexes.max invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "nMax:" + s + ";"
-		nMax = str2num(s)
-	endif
-	
-	if (nMax - nMin + 1 <= 0)
-		Print "Error: Less than 1 force curve according to header"
-		return -1
-	endif
-	
-	
-	// Get grid side lenghts
-	FindValue/TEXT="force-scan-map.position-pattern.grid.ilength=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.position-pattern.grid.ilength not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.position-pattern.grid.ilength=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.position-pattern.grid.ilength invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "iLength:" + s + ";"
-	endif
-	
-	FindValue/TEXT="force-scan-map.position-pattern.grid.jlength=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.position-pattern.grid.jlength not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.position-pattern.grid.jlength=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.position-pattern.grid.jlength invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "jLength:" + s + ";"
-	endif
-	
-	return 0	
-End
-
-
-// Read and parse JPK FV header given by filename.
-// Reads from zip by streaming.
-//
-// Parameters:
-// String filename: full path to packed JPK FV file
-// String &fvHeaderData: String to store header data in (pass by ref)
-// 
-// Return:
-// 0 if no errors, -1 otherwise
-//
-// fvHeaderData is in "key1:value1;key2:value2;" format
-// keys:
-// nMin				First FC index
-// nMax				Last FC index
-// iLength			Grid size in i direction
-// jLength			Grid size in j direction
-Function parseFVHeader_JPK_stream(filename, fvHeaderData)
-	String filename
-	String &fvHeaderData
-	
-	Variable result
-	fvHeaderData = ""
-	
-	// Get FV header into a string
-	Variable ref
-	String headerstream = ""
-	ref = ZIPa_openArchive(filename)
-	
-	if (ref <= 0)
-		Print "Error opening FV file: " + filename
-		return -1
-	endif
-
-	Variable ret
-	ret = ZIPa_open(ref, "header.properties")
-	
-	if (ret != 0)
-		Print "Error selecting header.properties from " + filename
-		return -1
-	endif
- 
-	// Read in 100 byte chunks from ref to buf,
-	// append to headerstream
-	String buf = ""
-	Do
-		ZIPa_read ref, buf, 100
-		if (V_flag < 0)
-			Print "Error reading FV header from: " + filename
-			return -1
-		elseif (V_flag == 0)
-			// End of file reached
-			break
-		endif
-		
-		headerstream += buf
-	while (1)
-	
-	ZIPa_closeArchive(ref)
-	
-	// ===============================
-	// Extract relevant FV header data
-	// ===============================
-	
-	// Read force volume header lines into a wave
-	result = readStringIntoWave(headerstream, "fvHeader", "")
-	if (result <= 0)
-		Print "Error saving FV header into wave"
-		return -1
-	endif
-
-
-	WAVE/T fvHeader
-	
-	
-	// Check if correct filetype and version
-	String fvFileTypeReq = "spm-force-scan-map-file"
-	String fvVersionReq = "0.6"
-	String s
-	
-	FindValue/TEXT="jpk-data-file=" fvHeader
-	if (V_value < 0)
-		Print "Filetype not found"
-		return -1
-	endif
-	SplitString/E="^jpk-data-file=(.+?)\\s*$" fvHeader[V_value], s
-	if (cmpstr(s, fvFileTypeReq) != 0)
-		Print "Wrong filetype (non-FV file)"
-		return -1
-	endif
-	
-	FindValue/TEXT="file-format-version=" fvHeader
-	if (V_value < 0)
-		Print "File version not found"
-		return -1
-	endif
-	SplitString/E="^file-format-version=(.+?)\\s*$" fvHeader[V_value], s
-	if (cmpstr(s, fvVersionReq) != 0)
-		Print "Wrong FV file version"
-		return -1
-	endif
-	
-
-	// Get number of force curves
-	Variable nMin, nMax
-	FindValue/TEXT="force-scan-map.indexes.min=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.indexes.min not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.indexes.min=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.indexes.min invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "nMin:" + s + ";"
-		nMin = str2num(s)
-	endif
-	
-	FindValue/TEXT="force-scan-map.indexes.max=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.indexes.max not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.indexes.max=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.indexes.max invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "nMax:" + s + ";"
-		nMax = str2num(s)
-	endif
-	
-	if (nMax - nMin + 1 <= 0)
-		Print "Error: Less than 1 force curve according to header"
-		return -1
-	endif
-	
-	
-	// Get grid side lenghts
-	FindValue/TEXT="force-scan-map.position-pattern.grid.ilength=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.position-pattern.grid.ilength not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.position-pattern.grid.ilength=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.position-pattern.grid.ilength invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "iLength:" + s + ";"
-	endif
-	
-	FindValue/TEXT="force-scan-map.position-pattern.grid.jlength=" fvHeader
-	if (V_value < 0)
-		Print "force-scan-map.position-pattern.grid.jlength not found"
-		return -1
-	endif
-	SplitString/E="^force-scan-map.position-pattern.grid.jlength=(\\d+?)\\s*$" fvHeader[V_value], s
-	if (strlen(s) <= 0)
-		Print "force-scan-map.position-pattern.grid.jlength invalid: " + fvHeader[V_value]
-		return -1
-	else
-		fvHeaderData += "jLength:" + s + ";"
-	endif
-	
-	return 0	
-End
-
-
-
-// Read and parse JPK FC headers given by path and curve index.
-// Currently only reads approach curve header (segment 0) .
-//
-// Parameters:
-// String path: path to force volume data root
-// Variable index: index of force curve to read
-// String &fcHeaderData: String to store header data in (pass by ref)
-// 
-// Return:
-// 0 if no errors, -1 otherwise
-//
-// fcHeaderData is in "key1:value1;key2:value2;" format
-// keys:
-// rampSizeConv	Conversion factor from raw to nm in Z height data
-// deflSens			Deflection sensitivity in nm/V
-// springConst		Spring constant in nN/nm
-Function parseFCHeader_JPK(path, index, fcHeaderData)
-	String path
-	Variable index
-	String &fcHeaderData
-	
-	Variable result
-	String s
-	fcHeaderData = ""
-	
-	if (stringmatch(path, "*:") == 0)
-		path += ":"
-	endif
-	
-	
-	// ===============================
-	// Extract relevant FC header data
-	// ===============================
-
-	// Read force curve header lines into a wave.
-	// Use 0th "segment", i.e. approach curve.
-	String fcHeaderFile = path + "index:" + num2str(index)
-	fcHeaderFile += ":segments:0:segment-header.properties"
-	
-	result = readFileIntoWave(fcHeaderFile, "fcHeader", "")
-	if (result <= 0)
-		Print "Could not read FC header"
-		return -1
-	endif
-
-	WAVE/T fcHeader
-	
-	// Get Z piezo ramp size multiplier for converting raw value to nm
-	// CHECK IF THIS IS CORRECT.... NOT FULLY CLEAR FROM JPK HEADER FILES
-	
-	// Get "nominal" ramp size multiplier
-	FindValue/TEXT="channel.height.conversion-set.conversion.nominal.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.height.conversion-set.conversion.nominal.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	Variable rampSizeConv = str2num(s)
-	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
-		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	endif
-	
-	// Get "calibrated" ramp size multiplier
-	FindValue/TEXT="channel.height.conversion-set.conversion.calibrated.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.height.conversion-set.conversion.calibrated.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	rampSizeConv *= str2num(s)
-	rampSizeConv *= 1e9	// conversion m to nm
-	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
-		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	else
-		fcHeaderData += "rampSizeConv:" + num2str(rampSizeConv) + ";"
-	endif
-	
-	
-	// Get deflection sensitivity in nm/V
-	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	Variable deflSens = str2num(s)
-	if (cmpstr(num2str(deflSens), "NaN") == 0)
-		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	else
-		fcHeaderData += "deflSens:" + num2str(deflSens * 1e9) + ";"
-	endif
-
-	// Get spring constant in nN/nm
-	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	Variable springConst = str2num(s)
-	if (cmpstr(num2str(springConst), "NaN") == 0)
-		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	else
-		fcHeaderData += "springConst:" + num2str(springConst) + ";"
-	endif
-	
-	return 0
-End
-
-
-// Read and parse JPK FC headers given by index from packed fv file.
-// Currently only reads approach curve header (segment 0).
-//
-// Parameters:
-// String filename: full path to force volume file
-// Variable index: index of force curve to read
-// String &fcHeaderData: String to store header data in (pass by ref)
-// 
-// Return:
-// 0 if no errors, -1 otherwise
-//
-// fcHeaderData is in "key1:value1;key2:value2;" format
-// keys:
-// rampSizeConv	Conversion factor from raw to nm in Z height data
-// deflSens			Deflection sensitivity in nm/V
-// springConst		Spring constant in nN/nm
-Function parseFCHeader_JPK_stream(filename, index, fcHeaderData)
-	String filename
-	Variable index
-	String &fcHeaderData
-	
-	Variable result
-	String s
-	fcHeaderData = ""
-	
-	// Read force curve header lines into a wave.
-	// Use 0th "segment", i.e. approach curve.
-	String fcHeaderFile = "index/" + num2str(index)
-	fcHeaderFile += "/segments/0/segment-header.properties"
-	
-	Variable ref
-	String headerstream = ""
-	ref = ZIPa_openArchive(filename)
-	
-	if (ref <= 0)
-		Print "Error opening FV file: " + filename
-		return -1
-	endif
-
-	Variable ret
-	ret = ZIPa_open(ref, fcHeaderFile)
-	
-	if (ret != 0)
-		Print "Error selecting " + fcHeaderFile + " from " + filename
-		return -1
-	endif
- 
-	// Read in 100 byte chunks from ref to buf,
-	// append to headerstream
-	String buf = ""
-	Do
-		ZIPa_read ref, buf, 100
-		if (V_flag < 0)
-			Print "Error reading FV header from: " + filename
-			return -1
-		elseif (V_flag == 0)
-			// End of file reached
-			break
-		endif
-		
-		headerstream += buf
-	while (1)
-	
-	ZIPa_closeArchive(ref)
-	
-	result = readStringIntoWave(headerstream, "fcHeader", "")
-	if (result <= 0)
-		Print "Could not read FC header"
-		return -1
-	endif
-
-	WAVE/T fcHeader
-	
-	// ===============================
-	// Extract relevant FC header data
-	// ===============================
-	
-	// Get Z piezo ramp size multiplier for converting raw value to nm
-	// CHECK IF THIS IS CORRECT.... NOT FULLY CLEAR FROM JPK HEADER FILES
-	
-	// Get "nominal" ramp size multiplier
-	FindValue/TEXT="channel.height.conversion-set.conversion.nominal.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.height.conversion-set.conversion.nominal.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	Variable rampSizeConv = str2num(s)
-	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
-		Print "channel.height.conversion-set.conversion.nominal.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	endif
-	
-	// Get "calibrated" ramp size multiplier
-	FindValue/TEXT="channel.height.conversion-set.conversion.calibrated.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.height.conversion-set.conversion.calibrated.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	rampSizeConv *= str2num(s)
-	rampSizeConv *= 1e9	// conversion m to nm
-	if (cmpstr(num2str(rampSizeConv), "NaN") == 0)
-		Print "channel.height.conversion-set.conversion.calibrated.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	else
-		fcHeaderData += "rampSizeConv:" + num2str(rampSizeConv) + ";"
-	endif
-	
-	
-	// Get deflection sensitivity in nm/V
-	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	Variable deflSens = str2num(s)
-	if (cmpstr(num2str(deflSens), "NaN") == 0)
-		Print "channel.vDeflection.conversion-set.conversion.distance.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	else
-		fcHeaderData += "deflSens:" + num2str(deflSens * 1e9) + ";"
-	endif
-
-	// Get spring constant in nN/nm
-	FindValue/TEXT="channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=" fcHeader
-	if (V_value < 0)
-		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier not found"
-		return -1
-	endif
-	SplitString/E="^channel.vDeflection.conversion-set.conversion.force.scaling.multiplier=(.+?)\\s*$" fcHeader[V_value], s
-	Variable springConst = str2num(s)
-	if (cmpstr(num2str(springConst), "NaN") == 0)
-		Print "channel.vDeflection.conversion-set.conversion.force.scaling.multiplier invalid: " + fcHeader[V_value]
-		return -1
-	else
-		fcHeaderData += "springConst:" + num2str(springConst) + ";"
-	endif
-	
-	return 0
-End
-
-
 
 // Analyse brush height, performing all the necessary data processing steps.
 // Works in the current data folder with the wave named fc<i> with <i> being the index parameter.
@@ -1648,7 +1500,7 @@ Function plot2(idx)
 	WAVE wf = $(wName + "_expfit")
 	
 	Display w vs wx
-	AppendToGraph wf
+	AppendToGraph/W=$S_name wf
 	ModifyGraph rgb[0]=(0,15872,65280) 
 
 	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
@@ -1658,6 +1510,84 @@ Function plot2(idx)
 	SetAxis bottom -1,75
 	
 	ShowInfo
+End
+
+Function rplot2(idx)
+	Variable idx
+	
+	String rwName = "rfc" + num2str(idx)
+	String wName = "fc" + num2str(idx)
+	WAVE rw = $rwName
+	WAVE rwx = $(rwName + "_x_tsd")
+	WAVE w = $wName
+	WAVE wx = $(wName + "_x_tsd")
+	WAVE wf = $(wName + "_expfit")
+	
+	Display w vs wx
+//	AppendToGraph/W=$S_name wf
+//	ModifyGraph rgb[0]=(0,15872,65280)
+	
+	AppendToGraph/W=$S_name rw vs rwx
+	ModifyGraph rgb[0]=(0,15872,35280)
+	
+
+	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
+	Label left "\\Z13force (pN)"
+	Label bottom "\\Z13tip-sample distance (nm)"
+	SetAxis/A
+	
+	ShowInfo
+End
+
+Function plot4(idx)
+	Variable idx
+	
+	String wname = "fc" + num2str(idx)
+	WAVE w = $wname
+	WAVE xTSD = $(wname + "_x_tsd")
+	WAVE wlog = $(wname + "_log")
+	
+	WAVE ws = $(wname + "_smooth")
+	WAVE xTSDs = $(wname + "_x_tsd_smooth")
+	WAVE wslog = $(wname + "_smooth_log")
+
+	Make/N=2/D/O tmp_noiselevel
+	WAVE tmp_noiselevel
+
+	if (WaveExists($(wname + "_linfit1")))
+		WAVE linfit1 = $(wname + "_linfit1")
+		WAVE linfit2 = $(wname + "_linfit2")
+	endif
+	
+	// Display traces
+	DoWindow/K tmp_reviewgraph
+	
+	Display/N=tmp_reviewgraph w vs xTSD
+	AppendToGraph/L ws vs xTSDs
+	ModifyGraph offset[0]={10,0}, offset[1]={10,0}
+	
+	AppendToGraph/R wlog vs xTSD
+	AppendToGraph/R wslog vs xTSDs
+	
+	tmp_noiselevel = log(str2num(StringByKey("noiseLevel", note(w))))
+	SetScale/I x 0, (xTSDs[numpnts(xTSDs)-1]), "nm", tmp_noiselevel
+	AppendToGraph/R tmp_noiselevel
+	
+	AppendToGraph/R linfit1
+	AppendToGraph/R linfit2
+	
+	SetAxis right -0.5,2.5
+	
+	ModifyGraph rgb[0]=(0,15872,65280), rgb[1]=(0,52224,52224), rgb[2]=(0,39168,0)
+	ModifyGraph rgb[3]=(65280,43520,0), rgb[4]=(0,0,0), rgb[5]=(0,0,0), rgb[6]=(65280,0,0)
+
+	ModifyGraph msize=0.5, mode=3
+	ModifyGraph marker[0]=16, marker[2]=16, marker[1]=0, marker[3]=0
+	ModifyGraph mode[4]=0, mode[5]=0, mode[6]=0
+	ModifyGraph lsize[4]=1, lsize[5]=2, lsize[6]=2
+	
+	ShowInfo
+
 End
 
 // waves: StringList of wave names (";" as separator)
@@ -1712,6 +1642,114 @@ Function AvgWaves(waves, from, to, wavg, wsd)
 	endfor
 	
 	return 0
+End
+
+
+
+
+#pragma rtGlobals=1		// Use modern global access method.
+
+constant PROGWIN_BAR_HEIGHT=20
+constant PROGWIN_BAR_WIDTH=250
+constant PROGWIN_MAX_DEPTH=10
+constant AUTO_CLOSE=1
+
+Function ProgWinOpen([coords])
+	wave coords
+	
+	dowindow ProgWin
+	if(v_flag)
+		dowindow /k/w=ProgWin ProgWin
+	endif
+	if(paramisdefault(coords))
+		make /free/n=4 coords={100,100,200+PROGWIN_BAR_WIDTH,110+PROGWIN_BAR_HEIGHT}
+	endif
+	NewPanel /K=1 /N=ProgWin /W=(coords[0],coords[1],coords[2],coords[3]) /FLT=1 as "Progress"
+	SetActiveSubwindow _endfloat_
+	MoveWindow /W=ProgWin coords[0],coords[1],coords[2],coords[3]
+	DoUpdate /W=ProgWin /E=1
+	SetWindow ProgWin userData=""
+	SetWindow ProgWin userData(abortName)=""
+	if(AUTO_CLOSE)
+		Execute /P/Q "dowindow /k/w=ProgWin ProgWin" // Automatic cleanup of progress window at the end of function execution.  
+	endif
+End
+
+Function Prog(name,num,denom[,msg])
+	String name,msg
+	variable num,denom
+	if(!wintype("ProgWin"))
+		ProgWinOpen()
+	endif
+	string data=GetUserData("ProgWin","","")
+	name=cleanupname(name,0)
+	variable currDepth=itemsinlist(data)
+	variable depth=whichlistitem(name,data)
+	depth=(depth<0) ? currDepth : depth
+	ControlInfo $("Prog_"+name)
+	if(!V_flag)
+		variable yy=10+(10+PROGWIN_BAR_HEIGHT)*depth
+		ValDisplay $("Prog_"+name),pos={50,yy},size={PROGWIN_BAR_WIDTH,PROGWIN_BAR_HEIGHT},limits={0,1,0},barmisc={0,0}, mode=3, win=ProgWin
+		TitleBox $("Status_"+name), pos={55+PROGWIN_BAR_WIDTH,yy},size={60,PROGWIN_BAR_HEIGHT}, win=ProgWin
+		Button $("Abort_"+name), pos={4,yy}, size={40,20}, title=name, proc=ProgWinButtons, win=ProgWin
+	endif
+	variable frac=num/denom
+	ValDisplay $("Prog_"+name),value=_NUM:frac, win=ProgWin, userData(num)=num2str(num), userData(denom)=num2str(denom)
+	string message=num2str(num)+"/"+num2str(denom)
+	if(!ParamIsDefault(msg))
+		message+=" "+msg
+	endif
+	TitleBox $("Status_"+name), title=message, win=ProgWin
+	if(depth==currDepth)
+		struct rect coords
+		GetWinCoords("ProgWin",coords,forcePixels=1)
+		MoveWindow /W=ProgWin coords.left,coords.top,coords.right,coords.bottom+(10+PROGWIN_BAR_HEIGHT)*72/ScreenResolution
+		SetWindow ProgWin userData=addlistitem(name,data,";",inf)
+	endif
+	DoUpdate /W=ProgWin /E=1
+	string abortName=GetUserData("ProgWin","","abortName")
+	if(stringmatch(name,abortName))
+		SetWindow ProgWin userData(abortName)=""
+		debuggeroptions
+		if(v_enable)
+			debugger
+		else
+			abort
+		endif
+	endif
+End
+
+Function ProgWinButtons(ctrlName)
+	String ctrlName
+	
+	Variable button_num
+	String action=StringFromList(0,ctrlName,"_")
+	string name=ctrlName[strlen(action)+1,strlen(ctrlName)-1]	
+	strswitch(action)
+		case "Abort":
+			SetWindow ProgWin userData(abortName)=name
+	endswitch
+End
+
+static Function GetWinCoords(win,coords[,forcePixels])
+	String win
+	STRUCT rect &coords
+	Variable forcePixels // Force values to be returned in pixels in cases where they would be returned in points.  
+	Variable type=WinType(win)
+	Variable factor=1
+	if(type)
+		GetWindow $win wsize;
+		if(type==7 && forcePixels==0)
+			factor=ScreenResolution/72
+		endif
+		//print V_left,factor,coords.left
+		coords.left=V_left*factor
+		coords.top=V_top*factor
+		coords.right=V_right*factor
+		coords.bottom=V_bottom*factor
+	else
+		print "No such window: "+win
+	endif
 End
 
 
