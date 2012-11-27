@@ -4,6 +4,17 @@
 #include <Wave Loading>
 
 
+// TODO
+// Code style
+// Quasi-height image, load byte offset from header
+// constant kTest (check if needed)
+// loadcheck=1234 (check if needed)
+// rewrite(style, variable names) chooser, inspector and rinspector functions (possibly refactor)
+// retraction curve handling (make optional, variable names etc)
+// general variable names ("bla", etc)
+// use free waves (when temp waves needed)
+// load curves into 2d array (could be much faster)
+// all timing (debug) code, check if needed
 
 
 // **** USER CONFIGURABLE CONSTANTS ****
