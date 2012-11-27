@@ -46,6 +46,7 @@ Constant kTest = 1234
 // **** END USER CONFIGURABLE CONSTANTS ****
 //
 
+
 // Create Igor Menu
 Menu "Force Map Analysis"
 	"Load File/1", LoadForceMap()
@@ -54,39 +55,10 @@ Menu "Force Map Analysis"
 	"Load and Analyse All FC's/4", LoadandAnalyseAll()
 End
 
-function idioticbutton()
-
-PauseUpdate; Silent 1
-	NewPanel/N=EpicWin/W=(200,100,800,300) as "Epic Win"
-	Button done,pos={300,150},size={50,20},title="Thanks!"
-	Button done,proc=thanks
-	TitleBox tb, title="you are f-ing awsome!!!", pos={250,100},size={0,0},anchor=MC,fsize=40,fstyle=0
-
-end
-
-function thanks(eventcode): ButtonControl
-	Struct WMButtonAction &eventcode
-	
-switch(eventcode.eventCode)
-	case 2:
-	print "ur welcome! ;)"
-	Execute/P/Q/Z "DoWindow/K "+eventcode.win
-	endswitch
-end
 
 Function LoadandAnalyseAll()
 
 	LoadForceMap()
-variable rand=enoise(1)
-print rand
-
-	if(rand<0.1)
-
-		idioticbutton()
-
-	endif
-
-
 
 	Variable i
 	String/G headerstuff,cw="ws"
@@ -110,48 +82,52 @@ print rand
 
 End
 
+
 Function/S LoadForceMap()
 
-String fileName
-String spath, ending
-String error01="No such file..."
-String/G totalpath
-Variable/G loadcheck=-1
+	String fileName
+	String spath, ending
+	String error01="No such file..."
+	String/G totalpath
+	Variable/G loadcheck=-1
 
-Variable fileref=0
+	Variable fileref=0
 
-//print kTest
-
-Open/D/R/M="Open Veeco Force Volume Experiment File"/F="All Files:.*;" fileref
-
-if (stringmatch(S_fileName, "")==1)
-print error01
-return error01
-endif
-
-loadcheck=1234
-
-
-SplitString/E=".+\:(.+\.\\d\\d\\d)$" S_fileName, fileName
-SplitString/E=".+(\.\\d\\d\\d)$" S_fileName, ending
-SplitString/E="(.+)\:.+\.\\d\\d\\d$" S_fileName, spath
-
-NewPath/Q/O temp, spath
-
-totalpath=S_fileName
-
-
-//print "FileName: "+fileName
-//print "FileFilter: "+ksFiltertemp
-//print "Symbolic Path "+spathtemp
-//print "Full Path "+S_fileName
-//print "Open File: "+S_fileName
-
-ReadMap("temp", totalpath)
-
-
+	//print kTest
+	
+	Open/D/R/M="Open Veeco Force Volume Experiment File"/F="All Files:.*;" fileref
+	
+	if (stringmatch(S_fileName, "")==1)
+		print error01
+		return error01
+	endif
+	
+	loadcheck=1234
+	
+	
+	SplitString/E=".+\:(.+\.\\d\\d\\d)$" S_fileName, fileName
+	SplitString/E=".+(\.\\d\\d\\d)$" S_fileName, ending
+	SplitString/E="(.+)\:.+\.\\d\\d\\d$" S_fileName, spath
+	
+	NewPath/Q/O temp, spath
+	
+	totalpath=S_fileName
+	
+	
+	//print "FileName: "+fileName
+	//print "FileFilter: "+ksFiltertemp
+	//print "Symbolic Path "+spathtemp
+	//print "Full Path "+S_fileName
+	//print "Open File: "+S_fileName
+	
+	ReadMap("temp", totalpath)
+	
 End
 
+
+
+// Kills all waves in the current data folder starting with fc
+// Returns 0 on success
 Function KillPreviousWaves()
 	Variable i = 0
 	String wList,rwList
@@ -172,6 +148,7 @@ Function KillPreviousWaves()
 		i+=1
 
 	while(1)
+
 	i=0
 	do
 		rw = StringFromList(i, rwList, ";")
@@ -184,9 +161,6 @@ Function KillPreviousWaves()
 		KillWaves $rw
 		i+=1
 	while(1)
-	
-	
-
 
 End
 
@@ -208,45 +182,36 @@ Function ReadMap(path, fileName)
 	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
 	KillPreviousWaves()
 	
-		// Read and parse FC file header
+	// Read and parse FC file header
 	result = ParseFCHeader(path, fileName, headerData)
 	
 	if (result == 0)
-	
-	String/G headerstuff=headerData
+		String/G headerstuff=headerData
 	
 		GBLoadWave/Q/B/N=image/T={16,4}/S=(NumberByKey("dataOffset", headerData)-2*totalWaves)/W=1/U=(totalWaves) fileName
 	
-	SplitString/E="(.+)\;$" S_waveNames, image
-	imagewave=image
+		SplitString/E="(.+)\;$" S_waveNames, image
+		imagewave=image
 	
 		redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
 	
-	Display/W=(29.25,55.25,450.75,458); AppendImage $imagewave
+		Display/W=(29.25,55.25,450.75,458); AppendImage $imagewave
 	
-	imagename=S_name
+		imagename=S_name
 	
-	ModifyImage $imagewave ctab={*,*,Gold,0}
+		ModifyImage $imagewave ctab={*,*,Gold,0}
 	
-	DoUpdate
-	
+		DoUpdate
 	endif
 
 End
 
 
+
 Function ChooseForceCurves()
 
-string/G totalpath, cw="ws"
-variable/G loadcheck
-
-
-
-
-			if (loadcheck==1234)
-			
-				
-			if(waveexists($cw))
+	string/G totalpath, cw="ws"
+	variable/G loadcheck
 	if (loadcheck==1234)
 		if(waveexists($cw))
 			KillWaves $cw
@@ -261,10 +226,10 @@ variable/G loadcheck
 	endif
 End
 
+
+
 Function ChooseFVs()
-string/G imagename
-
-
+	string/G imagename
 	PauseUpdate; Silent 1		// building window...
 	NewPanel/N=Dialog/W=(225,105,525,305) as "Dialog"
 	AutoPositionWindow/M=0/R=$imagename
@@ -274,10 +239,9 @@ string/G imagename
 	Button sall,proc=selectall
 	TitleBox warning,pos={131,83},size={20,20},title=""
 	TitleBox warning,anchor=MC,fColor=(65535,16385,16385)
-
-DoWindow/F $imagename
-SetWindow kwTopWin,hook(choose)= chooser
-
+	
+	DoWindow/F $imagename
+	SetWindow kwTopWin,hook(choose)= chooser
 End
 
 
@@ -294,20 +258,18 @@ Function selectall(sall) : ButtonControl
 End
 
 
+
 Function chooser(s)
-STRUCT WMWinHookStruct &s
-Variable rval= 0
-variable mouseloc,xval,yval, xbla,ybla,fcn
-string/G imagename, cw
-String/G headerstuff
+	STRUCT WMWinHookStruct &s
+	Variable rval= 0
+	variable mouseloc,xval,yval, xbla,ybla,fcn
+	string/G imagename, cw
+	String/G headerstuff
 
-
-
-
-switch(s.eventCode)
-case 3:
-yval=s.mouseLoc.v
-xval=s.mouseLoc.h
+	switch(s.eventCode)
+		case 3:
+			yval=s.mouseLoc.v
+			xval=s.mouseLoc.h
 
 
 			ybla=axisvalfrompixel(imagename,"left",yval-s.winrect.top)
@@ -363,10 +325,7 @@ Function DialogDoneButtonProc(ba) : ButtonControl
 			// kill the window AFTER this routine returns
 			Execute/P/Q/Z "DoWindow/K "+ba.win
 			ReadAllFCs("temp", totalpath)
-		endswitch
-	
-	
-	
+	endswitch
 
 	return 0
 End
@@ -381,13 +340,13 @@ Function ReadAllFCs(path, fileName)
 	Variable index=0
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
-	String/G headerstuff, imagewave, imagename,cw
+	String/G headerstuff, imagewave, imagename, cw
 	string temp,temp1,temp2
 	string temp02,temp12,temp22 //RETRACT
 
 	
-	DoWindow/F $imagename // Bring graph to front
-	if (V_Flag == 0)									// Verify that graph exists
+	DoWindow/F $imagename	// Bring graph to front
+	if (V_Flag == 0)			// Verify that graph exists
 		Abort "UserCursorAdjust: No such graph."
 		return -1
 	endif
@@ -395,12 +354,12 @@ Function ReadAllFCs(path, fileName)
 	
 	//progress bar
 	
-//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
-//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
-//	ValDisplay valdisp0,value= _NUM:0
-//	ValDisplay valdisp0,highColor=(0,65535,0)
+	//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
+	//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
+	//	ValDisplay valdisp0,value= _NUM:0
+	//	ValDisplay valdisp0,highColor=(0,65535,0)
 	//Button bStop,pos={375,32},size={50,20},title="Stop"
-//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
+	//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
 
 	
 	variable t0=ticks
@@ -410,85 +369,77 @@ Function ReadAllFCs(path, fileName)
 	
 	// read all FCs in file
 	do												
-			// Load actual data into new wave
-			// Waves are called fc0, fc1, etc.
+		// Load actual data into new wave
+		// Waves are called fc0, fc1, etc.
 			
 		if(dataOffsets[index])
 			
 			GBLoadWave/A=fc/B/Q/S=(dataOffsets[index])/T={16,4}/U=(ksFCPoints)/W=1 fileName
 			
-				temp="fc"+num2str(index)
+			temp="fc"+num2str(index)
 				
 								
-				SplitString/E="(.+)\;$" S_waveNames, temp1
-				SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
+			SplitString/E="(.+)\;$" S_waveNames, temp1
+			SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
 				
-				
-	
-				
-				
-				if(index!=str2num(temp2))
-				
-				
+							
+			if(index!=str2num(temp2))
 				duplicate/O $temp1 $temp; KillWaves $temp1
-				endif
+			endif
+			
 				
-				if (V_flag == 1)
-					// Increment number of successfully read files
-					headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
-					Note/K $temp, headerstuff
+			if (V_flag == 1)
+				// Increment number of successfully read files
+				headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
+				Note/K $temp, headerstuff
 					
-					success += 1
-				else
-					Print fileName + ": less or more than 1 curve read from file"
-				endif
+				success += 1
+			else
+				Print fileName + ": less or more than 1 curve read from file"
+			endif
 		endif
-		
 	
 		// RETRACT curves
 		if(dataOffsets[index])
 			GBLoadWave/A=rfc/B/Q/S=(dataOffsets[index]+(2*ksFCPoints))/T={16,4}/U=(ksFCPoints)/W=1 fileName
 			
-
-				temp02="rfc"+num2str(index)
+			temp02="rfc"+num2str(index)
 				
-				SplitString/E="(.+)\;$" S_waveNames, temp1
-				SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
+			SplitString/E="(.+)\;$" S_waveNames, temp1
+			SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
 				
-				if(index!=str2num(temp2))
-
-				duplicate/O $temp1 $temp02; KillWaves $temp1		//RETRACT
-				endif
+			if(index!=str2num(temp2))
+				duplicate/O $temp1 $temp02; KillWaves $temp1
+			endif
 				
-				if (V_flag == 1)
-					//Increment number of successfully read files
-					headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
-					Note/K $temp02, headerstuff
+			if (V_flag == 1)
+				//Increment number of successfully read files
+				headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
+				Note/K $temp02, headerstuff
 					
-					success += 1
-				else
-					Print fileName + ": less or more than 1 curve read from file"
-				endif
+				success += 1
+			else
+				Print fileName + ": less or more than 1 curve read from file"
+			endif
 		endif
-		
-		
 
 		index += 1
 		
 		Prog("ReadWaves",index,totalWaves)
 		
-//		ValDisplay valdisp0,value= _NUM:index+1,win=ProgressPanel
-//		DoUpdate /W=ProgressPanel
+		//		ValDisplay valdisp0,value= _NUM:index+1,win=ProgressPanel
+		//		DoUpdate /W=ProgressPanel
 		if( V_Flag == 2 )	// we only have one button and that means stop
 			break
-		endif
+		endif		
 		
 	while (index<totalWaves)
 	
+	
 	//KillWindow ProgressPanel
-	printf "Elapsed time was %g seconds\r",(ticks-t0)/60
+	printf "Elapsed time: %g seconds\r",(ticks-t0)/60
 
-// Create 2 waves
+	// Create 2 waves
 	// One holds file and wave names, the other the corresponding brush heights
 	// Value will be filled in in AnalyseBrushHeight
 	// Old waves will be overwritten
@@ -506,7 +457,7 @@ Function ReadAllFCs(path, fileName)
 	Make/O/N=(totalWaves) retractfeature
 
 
-return success	
+	return success	
 End
 
 
@@ -531,13 +482,13 @@ Function Analysis()
 	
 	wave wavestoanalyse=$cw
 	
-//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
-//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
-//	ValDisplay valdisp0,value= _NUM:0
-//	ValDisplay valdisp0, mode= 3
-//	ValDisplay valdisp0,highColor=(0,65535,0)
-	//Button bStop,pos={375,32},size={50,20},title="Stop"
-//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
+	//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
+	//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
+	//	ValDisplay valdisp0,value= _NUM:0
+	//	ValDisplay valdisp0, mode= 3
+	//	ValDisplay valdisp0,highColor=(0,65535,0)
+		//Button bStop,pos={375,32},size={50,20},title="Stop"
+	//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
 	
 
 	make/N=(totalWaves)/O usedtime //DEBUG
@@ -587,9 +538,9 @@ Function Analysis()
 		
 	Prog("Analysis",i,totalWaves)
 	
-		
-//	ValDisplay valdisp0,value= _NUM:i+1,win=ProgressPanel
-//	DoUpdate /W=ProgressPanel
+			
+	//	ValDisplay valdisp0,value= _NUM:i+1,win=ProgressPanel
+	//	DoUpdate /W=ProgressPanel
 
 	usedtime[i]= (ticks-z0)/60  //DEBUG
 	
@@ -597,11 +548,11 @@ Function Analysis()
 		
 	endfor
 	
-//	DoWindow/K ProgressPanel
+	//	DoWindow/K ProgressPanel
 	
 
 	
-	printf "Elapsed time was %g seconds\r",(ticks-t0)/60
+	printf "Elapsed time: %g seconds\r",(ticks-t0)/60
 	
 	variable bla=0
 	
@@ -633,7 +584,7 @@ Function Analysis()
 	
 	
 	if (result==0)
-//	ReviewCurves("brushheight_names", "brushheights")
+	//	ReviewCurves("brushheight_names", "brushheights")
 	endif
 	
 	
@@ -695,28 +646,24 @@ Function Analysis()
 	DoWindow/F retractfeaturesdetection
 	SetWindow kwTopWin,hook(inspect)=rinspector
 	DoUpdate
-	
-	
-	
+
 	return 0
 
 End
 
+
+
 Function rinspector(s)			//retractfeature
-STRUCT WMWinHookStruct &s
-Variable rval= 0
-variable mouseloc,xval,yval, xbla,ybla
-string/G cw
+	STRUCT WMWinHookStruct &s
+	Variable rval= 0
+	variable mouseloc,xval,yval, xbla,ybla
+	string/G cw
 
 
-switch(s.eventCode)
-case 3:
-yval=s.mouseLoc.v
-xval=s.mouseLoc.h
-
-
-ybla=round(axisvalfrompixel("retractfeaturesdetection","left",yval-s.winrect.top))
-xbla=round(axisvalfrompixel("retractfeaturesdetection","bottom",xval-s.winrect.left))
+	switch(s.eventCode)
+		case 3:
+			yval=s.mouseLoc.v
+			xval=s.mouseLoc.h
 
 
 			ybla=round(axisvalfrompixel("retractfeaturesdetection","left",yval-s.winrect.top))
@@ -750,20 +697,20 @@ End
 
 
 Function inspector(s)			//heightsmap
-STRUCT WMWinHookStruct &s
-Variable rval= 0
-variable mouseloc,xval,yval, xbla,ybla
-string/G cw
+	STRUCT WMWinHookStruct &s
+	Variable rval= 0
+	variable mouseloc,xval,yval, xbla,ybla
+	string/G cw
 
 
-switch(s.eventCode)
-case 3:
-yval=s.mouseLoc.v
-xval=s.mouseLoc.h
+	switch(s.eventCode)
+		case 3:
+			yval=s.mouseLoc.v
+			xval=s.mouseLoc.h
 
 
-ybla=round(axisvalfrompixel("results","left",yval-s.winrect.top))
-xbla=round(axisvalfrompixel("results","bottom",xval-s.winrect.left))
+			ybla=round(axisvalfrompixel("results","left",yval-s.winrect.top))
+			xbla=round(axisvalfrompixel("results","bottom",xval-s.winrect.left))
 
 
 			wave curvestoanalyse=$cw
@@ -787,17 +734,6 @@ xbla=round(axisvalfrompixel("results","bottom",xval-s.winrect.left))
 End
 
 
-
-
-
-
-
-
-
-
-//
-// Kills all waves in the current data folder starting with fc
-// Returns 0 on success
 
 
 // Read and parse FC file given by path and fileName
@@ -993,6 +929,7 @@ Function ParseFCHeader(path, fileName, headerData)
 	return 0	
 End
 
+
 // Read FC file given by path and fileName.
 // Add all lines into a new text wave (fullHeader)
 // return 0 if end of header found (defined by ksHeaderEnd)
@@ -1046,17 +983,18 @@ End
 
 
 Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
-Variable index, rampSize, VPerLSB, springConst
+	Variable index, rampSize, VPerLSB, springConst
+	
 	Variable totalWaves = ksFVRowSize*ksFVRowSize
 
-Variable/G V_fitoptions=4 //no fit window
+	Variable/G V_fitoptions=4 //no fit window
 
-String wnametemp = "fc" + num2str(index)		
-WAVE w = $wnametemp
-String header = note(w)
+	String wnametemp = "fc" + num2str(index)		
+	WAVE w = $wnametemp
+	String header = note(w)
 
-String wname= "rfc" + num2str(index)
-WAVE rw=$wname
+	String wname= "rfc" + num2str(index)
+	WAVE rw=$wname
 
 	
 	make/N=(totalWaves)/O timer1
@@ -1166,7 +1104,7 @@ WAVE rw=$wname
 		
 		if(rw[minpnt-1]<detectsetpnt && rw[minpnt+1]<detectsetpnt)
 			
-		return 1
+			return 1
 		
 		else
 		
@@ -1197,6 +1135,7 @@ WAVE rw=$wname
 	return -1
 	
 End
+
 
 // Analyse brush height, performing all the necessary data processing steps.
 // Works in the current data folder with the wave named fc<i> with <i> being the index parameter.
@@ -1589,6 +1528,7 @@ Function plot4(idx)
 
 End
 
+
 // waves: StringList of wave names (";" as separator)
 // from, to: average wave range [from, to] (both inclusive)
 // wavg, wsd: waves for averaged values and standard deviations
@@ -1644,9 +1584,6 @@ Function AvgWaves(waves, from, to, wavg, wsd)
 End
 
 
-
-
-#pragma rtGlobals=1		// Use modern global access method.
 
 constant PROGWIN_BAR_HEIGHT=20
 constant PROGWIN_BAR_WIDTH=250
