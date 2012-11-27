@@ -10,9 +10,9 @@
 //
 // Change constants to adjust procedure behaviour
 
-// Required version of FC file
-// for now, only tested with 0x07300000)
-static StrConstant ksVersionReq = "0x07300000" 
+// Allowed force map versions, comma separated
+// (add versions once they have been tested)
+static StrConstant ksVersionReq = "0x08100000"
 
 // Points per FC
 // for now only works with 4096
@@ -863,8 +863,8 @@ Function ParseFCHeader(path, fileName, headerData)
 		return -1
 	endif
 	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
-	if (cmpstr(s, ksVersionReq, 1) != 0)
-		Print filename + ": Wrong version"
+	if (WhichListItem(s, ksVersionReq, ",") < 0)
+		Print filename + ": File version not supported"
 		return -1
 	endif
 	FindValue/S=(subGroupOffset)/TEXT="\\Start context:" fullHeader
