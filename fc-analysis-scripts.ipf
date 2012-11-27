@@ -16,7 +16,11 @@ static StrConstant ksVersionReq = "0x08100000"
 
 // Points per FC
 // for now only works with 4096
-static Constant ksDataLength = 4096
+static Constant ksFCPoints = 4096
+
+// Force curves per row.
+// For now designed and tested only for square images with 32*32 = 1024 curves
+static Constant ksFVRowSize = 32
 
 // FC file type as written in header
 static StrConstant ksFileType = "FVOL"
@@ -61,6 +65,7 @@ end
 
 Function LoadandAnalyseAll()
 
+	LoadForceMap()
 variable rand=enoise(1)
 print rand
 
@@ -72,32 +77,25 @@ print rand
 
 
 
-LoadForceMap()
+	Variable i
+	String/G headerstuff,cw="ws"
 
-Variable i
-String/G headerstuff,cw="ws"
-
-make/O/N=1024 $cw
+	make/O/N=1024 $cw
 
 
+	wave temp=$cw
+
+	for(i=0;i<(ksFVRowSize*ksFVRowSize);i+=1)
+		temp[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
+	endfor
+
+	String/G totalpath
 
 
-wave temp=$cw
-
-for(i=0;i<1024;i+=1)
-
-	temp[i]=NumberByKey("dataOffset", headerstuff)+ksDataLength*2*2*i
-
-endfor
-
-String/G totalpath
+	ReadAllFCs("temp", totalpath)
 
 
-ReadAllFCs("temp", totalpath)
-
-
-Analysis()
-
+	Analysis()
 
 End
 
@@ -189,7 +187,7 @@ Function ReadMap(path, fileName)
 
 	Variable result
 	Variable index=0
-	Variable totalWaves=1024
+	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
 	String headerData, image
 	String/G imagewave, imagename
@@ -206,12 +204,12 @@ Function ReadMap(path, fileName)
 	
 	String/G headerstuff=headerData
 	
-	GBLoadWave/Q/B/N=image/T={16,4}/S=(NumberByKey("dataOffset", headerData)-2*totalWaves)/W=1/U=1024 fileName
+		GBLoadWave/Q/B/N=image/T={16,4}/S=(NumberByKey("dataOffset", headerData)-2*totalWaves)/W=1/U=(totalWaves) fileName
 	
 	SplitString/E="(.+)\;$" S_waveNames, image
 	imagewave=image
 	
-	redimension/N=(32,32) $imagewave
+		redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
 	
 	Display/W=(29.25,55.25,450.75,458); AppendImage $imagewave
 	
@@ -238,17 +236,18 @@ variable/G loadcheck
 			
 				
 			if(waveexists($cw))
+	if (loadcheck==1234)
+		if(waveexists($cw))
 			KillWaves $cw
-			endif
-			Make/N=1024/O $cw
+		endif
+		
+		Make/N=(ksFVRowSize*ksFVRowSize)/O $cw
 			
-				ChooseFVs()
-			else
-			print "Load Force Map via \"Force Map Analysis\"->\"Load File\" first!"
-			return 1
-			endif
-
-
+		ChooseFVs()
+	else
+		print "Load Force Map via \"Force Map Analysis\"->\"Load File\" first!"
+		return 1
+	endif
 End
 
 Function ChooseFVs()
@@ -270,23 +269,17 @@ SetWindow kwTopWin,hook(choose)= chooser
 
 End
 
+
 Function selectall(sall) : ButtonControl
-String sall
+	String sall
+	variable i
+	String/G headerstuff,cw
 
+	wave temp=$cw
 
-variable i
-String/G headerstuff,cw
-
-
-wave temp=$cw
-
-for(i=0;i<1024;i+=1)
-
-temp[i]=NumberByKey("dataOffset", headerstuff)+ksDataLength*2*2*i
-
-endfor
-
-
+	for(i=0;i<(ksFVRowsize*ksFVRowSize);i+=1)
+		temp[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
+	endfor
 End
 
 
@@ -306,46 +299,46 @@ yval=s.mouseLoc.v
 xval=s.mouseLoc.h
 
 
-ybla=axisvalfrompixel(imagename,"left",yval-s.winrect.top)
-xbla=axisvalfrompixel(imagename,"bottom",xval-s.winrect.left)
+			ybla=axisvalfrompixel(imagename,"left",yval-s.winrect.top)
+			xbla=axisvalfrompixel(imagename,"bottom",xval-s.winrect.left)
 
+			Variable xblar =  round(xbla)
+			Variable yblar =  round(ybla)
 
-Variable xblar =  round(xbla)
-Variable yblar =  round(ybla)
+			SetDrawEnv xcoord= prel,ycoord=prel, linethick=0, fillfgc=(65280,0,0);DelayUpdate
+			DrawRect xblar/ksFVRowSize+0.3/ksFVRowSize, 1-yblar/ksFVRowSize-0.3/ksFVRowSize,  xblar/ksFVRowSize+0.7/ksFVRowSize, 1-yblar/ksFVRowSize-0.7/ksFVRowSize
 
-SetDrawEnv xcoord= prel,ycoord=prel, linethick=0, fillfgc=(65280,0,0);DelayUpdate
-DrawRect xblar/32+0.3/32, 1-yblar/32-0.3/32,  xblar/32+0.7/32, 1-yblar/32-0.7/32
+			fcn=xblar+(yblar*ksFVRowSize)
 
+			print "fcn: ",fcn
 
+			Variable off=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*fcn*2
 
-fcn=xblar+(yblar*32)
+			wave offset=$cw
 
-print "fcn: ",fcn
+			print xblar, yblar
 
-Variable off=NumberByKey("dataOffset", headerstuff)+ksDataLength*2*fcn*2
+			if(xblar>=0 && xblar<=(ksFVRowSize-1) && yblar>=0 && yblar<=(ksFVRowSize-1))
 
-wave offset=$cw
+				offset[fcn]=off
 
-print xblar, yblar
+				print "offset read: ",off
 
-if(xblar>=0 && xblar<=31 && yblar>=0 && yblar<=31)
+			else
 
-offset[fcn]=off
+				print "Out of Range"
+			endif
 
-print "offset read: ",off
+			rval= 1
 
-else
+	EndSwitch
 
-print "Out of Range! YOU FOOOOOL!"
-endif
-
-rval= 1
-
-EndSwitch
-
-return rval
+	return rval
 
 End
+
+
+
 
 Function DialogDoneButtonProc(ba) : ButtonControl
 	STRUCT WMButtonAction &ba
@@ -375,7 +368,7 @@ Function ReadAllFCs(path, fileName)
 	
 	Variable result
 	Variable index=0
-	Variable totalWaves=1024
+	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
 	String/G headerstuff, imagewave, imagename,cw
 	string temp,temp1,temp2
@@ -411,7 +404,7 @@ Function ReadAllFCs(path, fileName)
 			
 		if(dataOffsets[index])
 			
-				GBLoadWave/A=fc/B/Q/S=(dataOffsets[index])/T={16,4}/U=(ksDataLength)/W=1 fileName
+			GBLoadWave/A=fc/B/Q/S=(dataOffsets[index])/T={16,4}/U=(ksFCPoints)/W=1 fileName
 			
 				temp="fc"+num2str(index)
 				
@@ -440,11 +433,10 @@ Function ReadAllFCs(path, fileName)
 				endif
 		endif
 		
-		if(dataOffsets[index])  //RETRACT
-		
-			
-
-				GBLoadWave/A=rfc/B/Q/S=(dataOffsets[index]+(2*ksDataLength))/T={16,4}/U=(ksDataLength)/W=1 fileName  //RETRACT
+	
+		// RETRACT curves
+		if(dataOffsets[index])
+			GBLoadWave/A=rfc/B/Q/S=(dataOffsets[index]+(2*ksFCPoints))/T={16,4}/U=(ksFCPoints)/W=1 fileName
 			
 
 				temp02="rfc"+num2str(index)
@@ -515,7 +507,7 @@ Function Analysis()
 // Returns 0 on success, -1 on error
 	String path,wavei			// Symbolic path name
 	
-	Variable totalWaves=1024
+	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable result=-1
 	
 	Variable i, t0=ticks
@@ -540,7 +532,7 @@ Function Analysis()
 	make/N=(totalWaves)/O usedtime //DEBUG
 	make/N=(totalWaves)/O usedtimeresult //DEBUG
 	variable zres
-	make/N=1024/O usedtimefeature  //DEBUG
+	make/N=(totalWaves)/O usedtimefeature  //DEBUG
 	variable zfeat
 	
 	
@@ -639,13 +631,13 @@ Function Analysis()
 	if(waveexists(heights))
 	killwaves $heights
 	endif
-	make/N=1024/O $heights
+	make/N=(totalWaves)/O $heights
 	wave urstheights=$heights
 	
 	if(waveexists(temp))
 	killwaves $temp
 	endif
-	make/N=1024/O $temp
+	make/N=(totalWaves)/O $temp
 	wave urst=$temp
 	
 	duplicate/O brushheights urstheights
@@ -664,13 +656,13 @@ Function Analysis()
 	
 	
 	
-	redimension/N=(32,32) retractfeature
+	redimension/N=(ksFVRowSize,ksFVRowSize) retractfeature
 	
 	Display/W=(29.25+450.75+400,55.25,450.75+450.75+400,458); AppendImage retractfeature 
 	DoWindow/C retractfeaturesdetection
 	ModifyImage retractfeature explicit=1,eval={0,46592,51712,63488},eval={-1,0,0,0},eval={1,65535,65535,65535}
 		
-	redimension/N=(32,32) urstheights
+	redimension/N=(ksFVRowSize,ksFVRowSize) urstheights
 
 	
 	Display/W=(29.25+450.75,55.25,450.75+450.75,458); AppendImage $heights
@@ -716,29 +708,31 @@ ybla=round(axisvalfrompixel("retractfeaturesdetection","left",yval-s.winrect.top
 xbla=round(axisvalfrompixel("retractfeaturesdetection","bottom",xval-s.winrect.left))
 
 
-wave curvestoanalyse=$cw
+			ybla=round(axisvalfrompixel("retractfeaturesdetection","left",yval-s.winrect.top))
+			xbla=round(axisvalfrompixel("retractfeaturesdetection","bottom",xval-s.winrect.left))
 
 
-if(xbla>=0 && xbla<=31 && ybla>=0 && ybla<=31 && curvestoanalyse[xbla+(ybla*32)])
-
-rplot2(abs(xbla+(ybla*32)))
+			wave curvestoanalyse=$cw
 
 
-print "FCNumber:",xbla+(ybla*32)
-print "X:",xbla,"Y:",ybla
-//print "Brushheight for selection:",brushheights[xbla+(ybla*32)],"nm"
+			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && curvestoanalyse[xbla+(ybla*ksFVRowSize)])
 
-else
-
-print "No Data here!"
-
-endif
+				rplot2(abs(xbla+(ybla*ksFVRowSize)))
 
 
+				print "FCNumber:",xbla+(ybla*ksFVRowSize)
+				print "X:",xbla,"Y:",ybla
+				//print "Brushheight for selection:",brushheights[xbla+(ybla*ksFVRowSize)],"nm"
 
-EndSwitch
+			else
 
-return rval
+				print "No Data here!"
+
+			endif
+
+	EndSwitch
+
+	return rval
 
 End
 
@@ -761,29 +755,23 @@ ybla=round(axisvalfrompixel("results","left",yval-s.winrect.top))
 xbla=round(axisvalfrompixel("results","bottom",xval-s.winrect.left))
 
 
-wave curvestoanalyse=$cw
-wave brushheights
+			wave curvestoanalyse=$cw
+			wave brushheights
 
 
-if(xbla>=0 && xbla<=31 && ybla>=0 && ybla<=31 && curvestoanalyse[xbla+(ybla*32)])
+			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && curvestoanalyse[xbla+(ybla*ksFVRowSize)])
 
-plot4(abs(xbla+(ybla*32)))
+				plot4(abs(xbla+(ybla*ksFVRowSize)))
 
-print "FCNumber:",xbla+(ybla*32)
-print "X:",xbla,"Y:",ybla
-print "Brushheight for selection:",brushheights[xbla+(ybla*32)],"nm"
+				print "FCNumber:",xbla+(ybla*ksFVRowSize)
+				print "X:",xbla,"Y:",ybla
+				print "Brushheight for selection:",brushheights[xbla+(ybla*ksFVRowSize)],"nm"
+			else
+				print "No Data here!"
+			endif
+	EndSwitch
 
-else
-
-print "No Data here!"
-
-endif
-
-
-
-EndSwitch
-
-return rval
+	return rval
 
 End
 
@@ -906,7 +894,7 @@ Function ParseFCHeader(path, fileName, headerData)
 		return -1
 	endif
 	SplitString/E=":\\s(\\d+)\\s\\d+$" fullHeader[V_value], s
-	if (str2num(s) != ksDataLength)
+	if (str2num(s) != ksFCPoints)
 		Print filename + ": Wrong number of data points per curve"
 		return -1
 	endif
@@ -1048,6 +1036,7 @@ End
 
 Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 Variable index, rampSize, VPerLSB, springConst
+	Variable totalWaves = ksFVRowSize*ksFVRowSize
 
 Variable/G V_fitoptions=4 //no fit window
 
@@ -1059,13 +1048,13 @@ String wname= "rfc" + num2str(index)
 WAVE rw=$wname
 
 	
-	make/N=1024/O timer1
+	make/N=(totalWaves)/O timer1
 	Variable tic1
-	make/N=1024/O timer2
+	make/N=(totalWaves)/O timer2
 	Variable tic2
-	make/N=1024/O timer3
+	make/N=(totalWaves)/O timer3
 	Variable tic3
-	make/N=1024/O timer4
+	make/N=(totalWaves)/O timer4
 	Variable tic4
 	
 	
@@ -1084,7 +1073,7 @@ WAVE rw=$wname
 	// Fit baseline and subtract from curve
 	CurveFit/NTHR=1/Q line  rw[2600,3600]
 	WAVE W_coef
-	Make/N=(ksDataLength) $(wname + "_blfit")
+	Make/N=(ksFCPoints) $(wname + "_blfit")
 	WAVE blfit = $(wname + "_blfit")
 	SetScale/I x 0, rampSize, "nm", blfit
 	// Save baseline to fc<i>_blfit
@@ -1101,7 +1090,7 @@ WAVE rw=$wname
 	tic3=ticks
 	// Fit deflection sensitivity and change y scale
 	CurveFit/NTHR=1/Q line  rw[10,100]
-	Make/N=(ksDataLength/8) $(wname + "_sensfit")	// display only 4096/8 points
+	Make/N=(ksFCPoints/8) $(wname + "_sensfit")	// display only 4096/8 points
 	WAVE sensfit = $(wname + "_sensfit")
 	SetScale/I x 0, (rampSize/8), "nm", sensfit
 	// Save fit to fc<i>_sensfit
@@ -1120,13 +1109,13 @@ WAVE rw=$wname
 	tic4=ticks
 	
 	// Create x values wave for tip-sample-distance
-	Make/N=(ksDataLength) $(wname + "_x_tsd")
+	Make/N=(ksFCPoints) $(wname + "_x_tsd")
 	WAVE xTSD = $(wname + "_x_tsd")
 	
 	timer4[index]=(ticks-tic4)/60
 	
 	// Write displacement x values
-	xTSD = rampSize/ksDataLength * p
+	xTSD = rampSize/ksFCPoints * p
 	// Subtract deflection to get tip-sample-distance
 	xTSD += rw
 	
@@ -1225,7 +1214,7 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	// Fit baseline and subtract from curve
 	CurveFit/NTHR=1/Q line  w[2600,3600]
 	WAVE W_coef
-	Make/N=(ksDataLength) $(wname + "_blfit")
+	Make/N=(ksFCPoints) $(wname + "_blfit")
 	WAVE blfit = $(wname + "_blfit")
 	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", blfit
 	// Save baseline to fc<i>_blfit
@@ -1239,7 +1228,7 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	
 	// Fit deflection sensitivity and change y scale
 	CurveFit/NTHR=1/Q line  w[10,100]
-	Make/N=(ksDataLength/8) $(wname + "_sensfit")	// display only 4096/8 points
+	Make/N=(ksFCPoints/8) $(wname + "_sensfit")	// display only 4096/8 points
 	WAVE sensfit = $(wname + "_sensfit")
 	SetScale/I x 0, (NumberByKey("rampSize", header)/8), "nm", sensfit
 	// Save fit to fc<i>_sensfit
@@ -1254,10 +1243,10 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	sensfit *= deflSens
 	
 	// Create x values wave for tip-sample-distance
-	Make/N=(ksDataLength) $(wname + "_x_tsd")
+	Make/N=(ksFCPoints) $(wname + "_x_tsd")
 	WAVE xTSD = $(wname + "_x_tsd")
 	// Write displacement x values
-	xTSD = NumberByKey("rampSize", header)/ksDataLength * p
+	xTSD = NumberByKey("rampSize", header)/ksFCPoints * p
 	// Subtract deflection to get tip-sample-distance
 	xTSD += w
 	
@@ -1324,7 +1313,7 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	
 	WAVE W_fitConstants
 	// Save fit to fc<i>_expfit
-	Make/N=(ksDataLength) $(wname + "_expfit")
+	Make/N=(ksFCPoints) $(wname + "_expfit")
 	WAVE expfit = $(wname + "_expfit")
 	// Set scale to match the tsd x scale
 	SetScale/I x 0, (xTSD[numpnts(xTSD)-1]), "nm", expfit
