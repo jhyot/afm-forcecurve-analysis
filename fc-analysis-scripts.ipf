@@ -1,5 +1,5 @@
 #pragma rtGlobals=1		// Use modern global access method.
-#pragma IndependentModule=ForceMapAnalysis
+//#pragma IndependentModule=ForceMapAnalysis  // disable for easier debugging etc
 #include <SaveGraph>
 #include <Wave Loading>
 
