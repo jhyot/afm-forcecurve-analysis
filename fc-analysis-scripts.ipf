@@ -78,7 +78,7 @@ Function LoadandAnalyseAll()
 	String/G totalpath
 
 
-	ReadAllFCs("temp", totalpath)
+	ReadAllFCs(totalpath)
 
 
 	Analysis()
@@ -336,7 +336,7 @@ Function DialogDoneButtonProc(ba) : ButtonControl
 			SetWindow $imagename,hook(choose)= $""
 			// kill the window AFTER this routine returns
 			Execute/P/Q/Z "DoWindow/K "+ba.win
-			ReadAllFCs("temp", totalpath)
+			ReadAllFCs(totalpath)
 	endswitch
 
 	return 0
@@ -344,8 +344,7 @@ End
 
 
 
-Function ReadAllFCs(path, fileName)
-	String path
+Function ReadAllFCs(fileName)
 	String fileName			// Igor-style path: e.g. "X:Code:igor-analyse-forcecurves:test-files:pegylated_glass.004"
 	
 	Variable result
