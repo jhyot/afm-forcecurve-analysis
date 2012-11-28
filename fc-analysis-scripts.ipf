@@ -7,7 +7,6 @@
 // TODO
 // Code style
 // Quasi-height image, load byte offset from header
-// constant kTest (check if needed)
 // loadcheck=1234 (check if needed)
 // rewrite(style, variable names) chooser, inspector and rinspector functions (possibly refactor)
 // retraction curve handling (make optional, variable names etc)
@@ -38,8 +37,6 @@ static StrConstant ksFileType = "FVOL"
 
 // String to be matched (full match, case insensitive) at header end
 static StrConstant ksHeaderEnd = "\\*File list end\r"
-
-Constant kTest = 1234
  
 
 //
