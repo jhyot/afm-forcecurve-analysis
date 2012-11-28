@@ -9,7 +9,7 @@
 // Quasi-height image, load byte offset from header
 // rewrite(style, variable names) chooser, inspector and rinspector functions (possibly refactor)
 // retraction curve handling (make optional, variable names etc)
-// general variable names ("bla", etc)
+// general variable names ("bla", "temp" etc)
 // use free waves (when temp waves needed)
 // load curves into 2d array (could be much faster)
 // all timing (debug) code, check if needed
@@ -48,7 +48,7 @@ Menu "Force Map Analysis"
 	"Load File/1", LoadForceMap()
 	"Choose Force Curves/2", ChooseForceCurves()
 	"Do Analysis/3", Analysis()
-	"Load and Analyse All FC's/4", LoadandAnalyseAll()
+	"Load and Analyse All FCs/4", LoadandAnalyseAll()
 End
 
 
@@ -64,15 +64,15 @@ Function LoadandAnalyseAll()
 	endif
 	
 	Variable i
-	String/G headerstuff,cw="ws"
+	String/G headerstuff, selectedCurvesW = "selectedcurves"
 
-	make/O/N=1024 $cw
+	make/O/N=(ksFVRowSize*ksFVRowsize) $selectedCurvesW
 
 
-	wave temp=$cw
+	Wave sel=$selectedCurvesW
 
 	for(i=0;i<(ksFVRowSize*ksFVRowSize);i+=1)
-		temp[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
+		sel[i] = NumberByKey("dataOffset", headerstuff) + ksFCPoints*2*2*i
 	endfor
 
 	String/G totalpath
@@ -222,14 +222,14 @@ End
 
 Function ChooseForceCurves()
 
-	string/G totalpath, cw="ws"
+	string/G totalpath, selectedCurvesW = "selectedcurves"
 	variable/G isMapLoaded
 	if (isMapLoaded==1)
 		if(waveexists($selectedCurvesW))
 			KillWaves $selectedCurvesW
 		endif
 		
-		Make/N=(ksFVRowSize*ksFVRowSize)/O $cw
+		Make/N=(ksFVRowSize*ksFVRowSize)/O $selectedCurvesW
 			
 		ChooseFVs()
 	else
@@ -260,12 +260,12 @@ End
 Function selectall(sall) : ButtonControl
 	String sall
 	variable i
-	String/G headerstuff,cw
+	String/G headerstuff, selectedCurvesW
 
-	wave temp=$cw
+	wave sel=$selectedCurvesW
 
 	for(i=0;i<(ksFVRowsize*ksFVRowSize);i+=1)
-		temp[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
+		sel[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
 	endfor
 End
 
@@ -275,7 +275,7 @@ Function chooser(s)
 	STRUCT WMWinHookStruct &s
 	Variable rval= 0
 	variable mouseloc,xval,yval, xbla,ybla,fcn
-	string/G imagename, cw
+	string/G imagename, selectedCurvesW
 	String/G headerstuff
 
 	switch(s.eventCode)
@@ -297,17 +297,17 @@ Function chooser(s)
 
 			print "fcn: ",fcn
 
-			Variable off=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*fcn*2
+			Variable offs = NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*fcn*2
 
-			wave offset=$cw
+			wave sel=$selectedCurvesW
 
 			print xblar, yblar
 
 			if(xblar>=0 && xblar<=(ksFVRowSize-1) && yblar>=0 && yblar<=(ksFVRowSize-1))
 
-				offset[fcn]=off
+				sel[fcn] = offs
 
-				print "offset read: ",off
+				print "offset read: ", offs
 
 			else
 
@@ -351,9 +351,8 @@ Function ReadAllFCs(fileName)
 	Variable index=0
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
-	String/G headerstuff, imagewave, imagename, cw
-	string temp,temp1,temp2
-	string temp02,temp12,temp22 //RETRACT
+	String/G headerstuff, imagename, selectedCurvesW
+	string fcWaveCurrent, fcWaveLoaded, fcNumLoaded
 
 	
 	DoWindow/F $imagename	// Bring graph to front
@@ -362,20 +361,9 @@ Function ReadAllFCs(fileName)
 		return -1
 	endif
 	
-	
-	//progress bar
-	
-	//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
-	//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
-	//	ValDisplay valdisp0,value= _NUM:0
-	//	ValDisplay valdisp0,highColor=(0,65535,0)
-	//Button bStop,pos={375,32},size={50,20},title="Stop"
-	//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
-
-	
 	variable t0=ticks
 	
-	wave dataOffsets=$cw
+	wave dataOffsets=$selectedCurvesW
 	
 	
 	// read all FCs in file
@@ -387,23 +375,22 @@ Function ReadAllFCs(fileName)
 			
 			GBLoadWave/A=fc/B/Q/S=(dataOffsets[index])/T={16,4}/U=(ksFCPoints)/W=1 fileName
 			
-			temp="fc"+num2str(index)
+			fcWaveCurrent="fc"+num2str(index)
 				
 								
-			SplitString/E="(.+)\;$" S_waveNames, temp1
-			SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
+			fcWaveLoaded = StringFromList(0, S_waveNames)
+			SplitString/E="(\\d+)$" fcWaveLoaded, fcNumLoaded
 				
 							
-			if(index!=str2num(temp2))
-				duplicate/O $temp1 $temp; KillWaves $temp1
+			if(index!=str2num(fcNumLoaded))
+				duplicate/O $fcWaveLoaded $fcWaveCurrent
+				KillWaves $fcWaveLoaded
 			endif
 			
 				
 			if (V_flag == 1)
+				Note/K $fcWaveCurrent, headerstuff
 				// Increment number of successfully read files
-				headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
-				Note/K $temp, headerstuff
-					
 				success += 1
 			else
 				Print fileName + ": less or more than 1 curve read from file"
@@ -414,20 +401,19 @@ Function ReadAllFCs(fileName)
 		if(dataOffsets[index])
 			GBLoadWave/A=rfc/B/Q/S=(dataOffsets[index]+(2*ksFCPoints))/T={16,4}/U=(ksFCPoints)/W=1 fileName
 			
-			temp02="rfc"+num2str(index)
+			fcWaveCurrent="rfc"+num2str(index)
 				
-			SplitString/E="(.+)\;$" S_waveNames, temp1
-			SplitString/E="\\D+(\\d+)\;$" S_waveNames, temp2
+			SplitString/E="(.+)\;$" S_waveNames, fcWaveLoaded
+			SplitString/E="\\D+(\\d+)\;$" S_waveNames, fcNumLoaded
 				
-			if(index!=str2num(temp2))
-				duplicate/O $temp1 $temp02; KillWaves $temp1
+			if(index!=str2num(fcNumLoaded))
+				duplicate/O $fcWaveLoaded $fcWaveCurrent
+				KillWaves $fcWaveLoaded
 			endif
 				
 			if (V_flag == 1)
+				Note/K $fcWaveCurrent, headerstuff
 				//Increment number of successfully read files
-				headerstuff += "fileName:" + fileName + ";"+"ForceCurveNumber:"+num2str(index)+";"
-				Note/K $temp02, headerstuff
-					
 				success += 1
 			else
 				Print fileName + ": less or more than 1 curve read from file"
@@ -438,16 +424,12 @@ Function ReadAllFCs(fileName)
 		
 		Prog("ReadWaves",index,totalWaves)
 		
-		//		ValDisplay valdisp0,value= _NUM:index+1,win=ProgressPanel
-		//		DoUpdate /W=ProgressPanel
 		if( V_Flag == 2 )	// we only have one button and that means stop
 			break
 		endif		
 		
 	while (index<totalWaves)
 	
-	
-	//KillWindow ProgressPanel
 	printf "Elapsed time: %g seconds\r",(ticks-t0)/60
 
 	// Create 2 waves
@@ -478,29 +460,22 @@ Function Analysis()
 
 // Analyse all force curves (FC) in a folder
 // Returns 0 on success, -1 on error
-	String path,wavei			// Symbolic path name
+	String path		// Symbolic path name
+	String wavei			
 	
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable result=-1
 	
 	Variable i, t0=ticks
 	
-	String/G cw
+	String/G selectedCurvesW
 	
 	wave brushheights
 	wave retractfeature
 
 	
-	wave wavestoanalyse=$cw
-	
-	//	NewPanel /N=ProgressPanel /W=(285,111,739,193)
-	//	ValDisplay valdisp0,pos={18,32},size={342,18},limits={0,totalWaves,0},barmisc={0,0}
-	//	ValDisplay valdisp0,value= _NUM:0
-	//	ValDisplay valdisp0, mode= 3
-	//	ValDisplay valdisp0,highColor=(0,65535,0)
-		//Button bStop,pos={375,32},size={50,20},title="Stop"
-	//	DoUpdate /W=ProgressPanel /E=1	// mark this as our progress window
-	
+	wave sel=$selectedCurvesW
+		
 
 	make/N=(totalWaves)/O usedtime //DEBUG
 	make/N=(totalWaves)/O usedtimeresult //DEBUG
@@ -510,105 +485,86 @@ Function Analysis()
 	
 	
 	string header
+	Variable num = 0
 	
 	for (i=0; i < totalWaves; i+=1)
 	
 		variable z0=ticks		//DEBUG
 		
-		string tempw="fc"+num2str(i)
+		if(sel[i])
 		
-		WAVE w=$tempw
+			string tempw="fc"+num2str(i)
 		
-		header = note(w)
+			WAVE w=$tempw
 		
-		variable rampSize=numberbykey("rampSize", header)
-		variable VPerLSB=numberbykey("VPerLSB", header)
-		variable springConst=numberbykey("springConst", header)
-	
-		if(wavestoanalyse[i])	
+			header = note(w)
+		
+			variable rampSize=numberbykey("rampSize", header)
+			variable VPerLSB=numberbykey("VPerLSB", header)
+			variable springConst=numberbykey("springConst", header)	
 		
 			zres=ticks //DEBUG
 		
 			result = AnalyseBrushHeight(i, brushheight_names, brushheights)
-			
+			if(result < 0) //could not find start/endpoint of fit or could not fit
+				brushheights[i] = -1 //put some out-of-range number for brushheight (for better visualization in result-graph)
+			endif
 			usedtimeresult[i]=(ticks-zres)/60 //DEBUG
 			
 			zfeat=ticks	//DEBUG
 			
-			
-			
 			retractfeature[i]=retractedforcecurvebaselinefit(i, rampSize, VPerLSB, springConst)	//baselinefit for the retracted curves.
 			
 			usedtimefeature[i]=(ticks-zfeat)/60	//DEBUG
-		
-			if(result==-1) //could not find start/endpoint of fit or could not fit
-				brushheights[i]=-1 //put some out-of-range number for brushheight (for better visualization in result-graph)
-			endif
-
+			
+			num += 1
 		endif
 		
 	Prog("Analysis",i,totalWaves)
 	
-			
-	//	ValDisplay valdisp0,value= _NUM:i+1,win=ProgressPanel
-	//	DoUpdate /W=ProgressPanel
 
 	usedtime[i]= (ticks-z0)/60  //DEBUG
 	
 	
 		
 	endfor
-	
-	//	DoWindow/K ProgressPanel
-	
 
 	
 	printf "Elapsed time: %g seconds\r",(ticks-t0)/60
 	
-	variable bla=0
-	
-	for (i=0; i < totalWaves; i+=1)
-	
-		if(wavestoanalyse[i])	
-		bla+=1
-		endif
-		
-	endfor
-	
 	if(waveexists(brushheights2))
-	KillWaves brushheights2
+		KillWaves brushheights2
 	endif
-	Make/N=(bla)/O brushheights2
 	
-	bla=0
+	Make/N=(num)/O brushheights2
+	
+	num=0
 	wave brushheights
+	
+	// What does this loop do !?
 	for (i=0; i < totalWaves; i+=1)
-	
-		if(wavestoanalyse[i])	
-		bla+=1
-		brushheights2[bla-1]=brushheights[i]
+		if(sel[i])	
+			num += 1
+			brushheights2[num-1] = brushheights[i]
 		endif
-		
 	endfor
-	
 
-	
-	
-	if (result==0)
-	//	ReviewCurves("brushheight_names", "brushheights")
-	endif
+
+//	if (result==0)
+//	ReviewCurves("brushheight_names", "brushheights")
+//	endif
 	
 	
 	string heights="heightsmap", temp="tempwave"
 	
 	if(waveexists(heights))
-	killwaves $heights
+		killwaves $heights
 	endif
 	make/N=(totalWaves)/O $heights
 	wave urstheights=$heights
 	
 	if(waveexists(temp))
-	killwaves $temp
+		killwaves $temp
 	endif
 	make/N=(totalWaves)/O $temp
 	wave urst=$temp
@@ -631,20 +587,20 @@ Function Analysis()
 	
 	redimension/N=(ksFVRowSize,ksFVRowSize) retractfeature
 	
-	Display/W=(29.25+450.75+400,55.25,450.75+450.75+400,458); AppendImage retractfeature 
+	Display/W=(29.25+450.75+400,55.25,450.75+450.75+400,458)
+	AppendImage retractfeature 
+	
 	DoWindow/C retractfeaturesdetection
 	ModifyImage retractfeature explicit=1,eval={0,46592,51712,63488},eval={-1,0,0,0},eval={1,65535,65535,65535}
-		
+	
 	redimension/N=(ksFVRowSize,ksFVRowSize) urstheights
 
+	Display/W=(29.25+450.75,55.25,450.75+450.75,458)
+	AppendImage $heights
 	
-	Display/W=(29.25+450.75,55.25,450.75+450.75,458); AppendImage $heights
 	DoWindow/C results
 	
-	
 	ModifyImage $heights ctab={V_min+1+1e-3,V_max,Gold,0}, minRGB=(46592,51712,63488), maxRGB=(63488,0,0)
-	
-	
 	
 	DoWindow/F results
 	ColorScale/C/N=text0/F=0/A=RC/E image=heightsmap
@@ -668,7 +624,7 @@ Function rinspector(s)			//retractfeature
 	STRUCT WMWinHookStruct &s
 	Variable rval= 0
 	variable mouseloc,xval,yval, xbla,ybla
-	string/G cw
+	string/G selectedCurvesW
 
 
 	switch(s.eventCode)
@@ -681,10 +637,10 @@ Function rinspector(s)			//retractfeature
 			xbla=round(axisvalfrompixel("retractfeaturesdetection","bottom",xval-s.winrect.left))
 
 
-			wave curvestoanalyse=$cw
+			wave sel=$selectedCurvesW
 
 
-			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && curvestoanalyse[xbla+(ybla*ksFVRowSize)])
+			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && sel[xbla+(ybla*ksFVRowSize)])
 
 				rplot2(abs(xbla+(ybla*ksFVRowSize)))
 
@@ -711,7 +667,7 @@ Function inspector(s)			//heightsmap
 	STRUCT WMWinHookStruct &s
 	Variable rval= 0
 	variable mouseloc,xval,yval, xbla,ybla
-	string/G cw
+	string/G selectedCurvesW
 
 
 	switch(s.eventCode)
@@ -724,13 +680,13 @@ Function inspector(s)			//heightsmap
 			xbla=round(axisvalfrompixel("results","bottom",xval-s.winrect.left))
 
 
-			wave curvestoanalyse=$cw
+			wave sel=$selectedCurvesW
 			wave brushheights
 
 
-			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && curvestoanalyse[xbla+(ybla*ksFVRowSize)])
+			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && sel[xbla+(ybla*ksFVRowSize)])
 
-				plot4(abs(xbla+(ybla*ksFVRowSize)))
+				plot2(abs(xbla+(ybla*ksFVRowSize)))
 
 				print "FCNumber:",xbla+(ybla*ksFVRowSize)
 				print "X:",xbla,"Y:",ybla
