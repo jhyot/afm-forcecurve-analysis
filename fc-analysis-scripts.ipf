@@ -7,7 +7,6 @@
 // TODO
 // Code style
 // Quasi-height image, load byte offset from header
-// loadcheck=1234 (check if needed)
 // rewrite(style, variable names) chooser, inspector and rinspector functions (possibly refactor)
 // retraction curve handling (make optional, variable names etc)
 // general variable names ("bla", etc)
@@ -55,8 +54,15 @@ End
 
 Function LoadandAnalyseAll()
 
-	LoadForceMap()
+	Variable result
+	
+	result = LoadForceMap()
 
+	if (result<0)
+		print "Aborted loading force map"
+		return -1
+	endif
+	
 	Variable i
 	String/G headerstuff,cw="ws"
 
@@ -80,44 +86,40 @@ Function LoadandAnalyseAll()
 End
 
 
-Function/S LoadForceMap()
+// Displays dialog to select force map file and
+// calls the function to load header and FV image.
+// Saves filename to global string variable.
+//
+// Returns 0 if map loaded correctly, -1 otherwise.
+// Also sets global variable isMapLoaded to 1.
+Function LoadForceMap()
 
-	String fileName
-	String spath, ending
-	String error01="No such file..."
 	String/G totalpath
-	Variable/G loadcheck=-1
+	Variable/G isMapLoaded = 0
 
-	Variable fileref=0
-
-	//print kTest
+	Variable result = 0
+	Variable fileref = 0
 	
 	Open/D/R/M="Open Veeco Force Volume Experiment File"/F="All Files:.*;" fileref
 	
-	if (stringmatch(S_fileName, "")==1)
-		print error01
-		return error01
+	if (cmpstr(S_fileName, "") == 0)
+		print "No file selected"
+		return -1
 	endif
 	
-	loadcheck=1234
+	NewPath/Q/O temp, ParseFilePath(1, S_fileName, ":", 1, 0)
 	
+	totalpath = S_fileName
 	
-	SplitString/E=".+\:(.+\.\\d\\d\\d)$" S_fileName, fileName
-	SplitString/E=".+(\.\\d\\d\\d)$" S_fileName, ending
-	SplitString/E="(.+)\:.+\.\\d\\d\\d$" S_fileName, spath
+	result = ReadMap("temp", totalpath)
 	
-	NewPath/Q/O temp, spath
+	if (result < 0)
+		print "Error reading FV map"
+		return -1
+	endif
 	
-	totalpath=S_fileName
-	
-	
-	//print "FileName: "+fileName
-	//print "FileFilter: "+ksFiltertemp
-	//print "Symbolic Path "+spathtemp
-	//print "Full Path "+S_fileName
-	//print "Open File: "+S_fileName
-	
-	ReadMap("temp", totalpath)
+	isMapLoaded = 1
+	return 0
 	
 End
 
@@ -162,6 +164,11 @@ Function KillPreviousWaves()
 End
 
 
+// Reads header from FV file and stores it in a global variable.
+// Reads and displays image (quasi-topography) from FV file.
+// Also kills previous force volume related files in current data folder.
+//
+// Returns 0 if no errors, -1 otherwise
 Function ReadMap(path, fileName)
 	String path
 	String fileName			// Igor-style path: e.g. "X:Code:igor-analyse-forcecurves:test-files:pegylated_glass.004"
@@ -182,24 +189,32 @@ Function ReadMap(path, fileName)
 	// Read and parse FC file header
 	result = ParseFCHeader(path, fileName, headerData)
 	
-	if (result == 0)
-		String/G headerstuff=headerData
-	
-		GBLoadWave/Q/B/N=image/T={16,4}/S=(NumberByKey("dataOffset", headerData)-2*totalWaves)/W=1/U=(totalWaves) fileName
-	
-		SplitString/E="(.+)\;$" S_waveNames, image
-		imagewave=image
-	
-		redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
-	
-		Display/W=(29.25,55.25,450.75,458); AppendImage $imagewave
-	
-		imagename=S_name
-	
-		ModifyImage $imagewave ctab={*,*,Gold,0}
-	
-		DoUpdate
+	if (result < 0)
+		print "Could not parse header correctly"
+		return -1
 	endif
+	
+	String/G headerstuff=headerData
+
+	GBLoadWave/Q/B/N=image/T={16,4}/S=(NumberByKey("dataOffset", headerData)-2*totalWaves)/W=1/U=(totalWaves) fileName
+	
+	if (V_flag < 1)
+		print "Could not load force volume image data"
+		return -1
+	endif
+
+	imagewave = StringFromList(0,S_waveNames)
+
+	redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
+
+	Display/W=(29.25,55.25,450.75,458)
+	AppendImage $imagewave
+
+	imagename=S_name
+
+	ModifyImage $imagewave ctab={*,*,Gold,0}
+
+	DoUpdate
 
 End
 
@@ -208,10 +223,10 @@ End
 Function ChooseForceCurves()
 
 	string/G totalpath, cw="ws"
-	variable/G loadcheck
-	if (loadcheck==1234)
-		if(waveexists($cw))
-			KillWaves $cw
+	variable/G isMapLoaded
+	if (isMapLoaded==1)
+		if(waveexists($selectedCurvesW))
+			KillWaves $selectedCurvesW
 		endif
 		
 		Make/N=(ksFVRowSize*ksFVRowSize)/O $cw
@@ -314,7 +329,7 @@ Function DialogDoneButtonProc(ba) : ButtonControl
 	STRUCT WMButtonAction &ba
 	
 	string/G imagename, totalpath
-	variable/G loadcheck
+
 	switch( ba.eventCode )
 		case 2:									// mouse up
 			// turn off the chooser hook
