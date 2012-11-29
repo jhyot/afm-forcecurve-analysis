@@ -107,11 +107,9 @@ Function LoadForceMap()
 		return -1
 	endif
 	
-	NewPath/Q/O temp, ParseFilePath(1, S_fileName, ":", 1, 0)
-	
 	totalpath = S_fileName
 	
-	result = ReadMap("temp", totalpath)
+	result = ReadMap(totalpath)
 	
 	if (result < 0)
 		print "Error reading FV map"
@@ -169,10 +167,8 @@ End
 // Also kills previous force volume related files in current data folder.
 //
 // Returns 0 if no errors, -1 otherwise
-Function ReadMap(path, fileName)
-	String path
-	String fileName			// Igor-style path: e.g. "X:Code:igor-analyse-forcecurves:test-files:pegylated_glass.004"
-
+Function ReadMap(fileName)
+	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
 
 	Variable result
 	Variable index=0
@@ -187,7 +183,7 @@ Function ReadMap(path, fileName)
 	KillPreviousWaves()
 	
 	// Read and parse FC file header
-	result = ParseFCHeader(path, fileName, headerData)
+	result = ParseFCHeader(fileName, headerData)
 	
 	if (result < 0)
 		print "Could not parse header correctly"
@@ -683,7 +679,7 @@ End
 
 
 
-// Read and parse FC file given by path and fileName
+// Read and parse FC file given by fileName
 // Write relevant info about FC into String headerData (pass by ref)
 // Return 0 if no errors, -1 otherwise
 //
@@ -694,15 +690,15 @@ End
 // VPerLSB			Vertical deflection V/LSB
 // deflSens			Deflection sensitivity nm/V
 // springConst		Spring constant nN/nm
-Function ParseFCHeader(path, fileName, headerData)
-	String path, fileName
-	String &headerData
+Function ParseFCHeader(fileName, headerData)
+	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
+	String &headerData		// Pass-by-ref string will be filled with header data
 	
 	Variable result, subGroupOffset
 	headerData = ""
 	
 	
-	result = ReadFCHeaderLines(path, fileName)
+	result = ReadFCHeaderLines(fileName)
 	if (result != 0)
 		Print fileName + ": Did not find header end\r"
 		return -1
@@ -877,23 +873,23 @@ Function ParseFCHeader(path, fileName, headerData)
 End
 
 
-// Read FC file given by path and fileName.
+// Read FC file given by fileName.
 // Add all lines into a new text wave (fullHeader)
 // return 0 if end of header found (defined by ksHeaderEnd)
 // -1 otherwise.
 // Last line of header not included in fullHeader.
 // CR (\r) is at end of each line in the wave.
-Function ReadFCHeaderLines(path, fileName)
-	String path, fileName
+Function ReadFCHeaderLines(fileName)
+	String fileName			// Full Igor-style path to filename ("folder:to:file.ext")
 	
 	Variable result = -1			// Set to 0 if end of header found
 	
-	if ((strlen(path) == 0) || (strlen(fileName) == 0))
+	if (strlen(fileName) == 0)
 		return -1
 	endif
 	
 	Variable refNum
-	Open/R/P=$path refNum as fileName				
+	Open/R refNum as fileName				
 	if (refNum == 0)	
 		return -1						// Error
 	endif
@@ -1650,11 +1646,10 @@ End
 // Put debug snippets in this function to be able to run them
 // from the console.
 Function DebugTest()
-	NewPath/O tmpPath1, "C:Users:Janne:Desktop:au-rings-afm:peg57:"
 	Variable tmpRet
 	String tmpHd
 	
-	tmpRet = ParseFCHeader("tmpPath1", "peg57-pbs-0.spm", tmpHd)
+	tmpRet = ParseFCHeader("C:Users:Janne:Desktop:au-rings-afm:peg57:peg57-pbs-0.spm", tmpHd)
 	Print "ret:" + num2str(tmpRet)
 	Print tmpHd
 End
