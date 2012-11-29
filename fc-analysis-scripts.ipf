@@ -351,7 +351,6 @@ Function ReadAllFCs(fileName)
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
 	String/G headerstuff, imagename, selectedCurvesW
-	string fcWaveCurrent, fcWaveLoaded, fcNumLoaded
 
 	
 	DoWindow/F $imagename	// Bring graph to front
@@ -362,7 +361,7 @@ Function ReadAllFCs(fileName)
 	
 	variable t0=ticks
 	
-	wave dataOffsets=$selectedCurvesW
+	WAVE dataOffsets=$selectedCurvesW
 	WAVE fc, rfc
 	WAVE/T fcmeta
 	
