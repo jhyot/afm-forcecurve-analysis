@@ -12,7 +12,6 @@
 // general variable names ("bla", "temp" etc)
 // use free waves (when temp waves needed)
 // Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
-// all timing (debug) code, check if needed
 
 
 // **** USER CONFIGURABLE CONSTANTS ****
@@ -440,16 +439,8 @@ Function Analysis()
 
 	
 	wave sel=$selectedCurvesW
-		
 
 	WAVE/T fcmeta
-	make/N=(totalWaves)/O usedtime //DEBUG
-	make/N=(totalWaves)/O usedtimeresult //DEBUG
-	variable zres
-	make/N=(totalWaves)/O usedtimefeature  //DEBUG
-	variable zfeat
-	
-	
 	string header
 	Variable num = 0
 	
@@ -461,8 +452,6 @@ Function Analysis()
 	
 	for (i=0; i < totalWaves; i+=1)
 	
-		variable z0=ticks		//DEBUG
-		
 		if(sel[i])
 		
 			header = fcmeta[i]
@@ -477,18 +466,10 @@ Function Analysis()
 			SetScale/I x 0, (rampSize/8), "nm", fc_sensfit
 			SetScale/I x 0, (rampSize), "nm", fc_expfit
 		
-			zres=ticks //DEBUG
-		
 			result = AnalyseBrushHeight(i, brushheight_names, brushheights)
 			if(result < 0) //could not find start/endpoint of fit or could not fit
 				brushheights[i] = -1 //put some out-of-range number for brushheight (for better visualization in result-graph)
 			endif
-			usedtimeresult[i]=(ticks-zres)/60 //DEBUG
-			
-			zfeat=ticks	//DEBUG
-			
-			
-			usedtimefeature[i]=(ticks-zfeat)/60	//DEBUG
 			
 			//retractfeature[i]=retractedforcecurvebaselinefit(i, rampSize, VPerLSB, springConst)	//baselinefit for the retracted curves.
 			retractfeature[i]=1 // until retractedforcecurvebaselinefit is fixed for 2d waves
@@ -497,11 +478,6 @@ Function Analysis()
 		endif
 		
 	Prog("Analysis",i,totalWaves)
-	
-
-	usedtime[i]= (ticks-z0)/60  //DEBUG
-	
-	
 		
 	endfor
 
