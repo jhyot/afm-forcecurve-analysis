@@ -11,7 +11,7 @@
 // retraction curve handling (make optional, variable names etc)
 // general variable names ("bla", "temp" etc)
 // use free waves (when temp waves needed)
-// load curves into 2d array (could be much faster)
+// Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
 // all timing (debug) code, check if needed
 
 
@@ -21,7 +21,7 @@
 
 // Allowed force map versions, comma separated
 // (add versions once they have been tested)
-static StrConstant ksVersionReq = "0x08100000"
+static StrConstant ksVersionReq = "0x08100000,0x08150300"
 
 // Points per FC
 // for now only works with 4096
@@ -204,8 +204,12 @@ Function ReadMap(path, fileName)
 	endif
 
 	imagewave = StringFromList(0,S_waveNames)
-
 	redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
+
+	// Create waves for holding the curves (2d array, 1 column per curve)
+	// and for metadata about each curve (1 row per curve)
+	Make/O/N=(ksFCPoints, totalWaves) fc=NaN, rfc=NaN
+	Make/T/O/N=(totalWaves) fcmeta=""
 
 	Display/W=(29.25,55.25,450.75,458)
 	AppendImage $imagewave
@@ -364,69 +368,33 @@ Function ReadAllFCs(fileName)
 	variable t0=ticks
 	
 	wave dataOffsets=$selectedCurvesW
+	WAVE fc, rfc
+	WAVE/T fcmeta
 	
-	
-	// read all FCs in file
+	// read selected FCs into 2d wave (1 curve per column, leave empty columns if wave not selected)
 	do												
-		// Load actual data into new wave
-		// Waves are called fc0, fc1, etc.
-			
 		if(dataOffsets[index])
 			
-			GBLoadWave/A=fc/B/Q/S=(dataOffsets[index])/T={16,4}/U=(ksFCPoints)/W=1 fileName
+			GBLoadWave/N=fcload/B/Q/S=(dataOffsets[index])/T={16,4}/U=(ksFCPoints)/W=2 fileName
 			
-			fcWaveCurrent="fc"+num2str(index)
+			if (V_flag == 2)
+				WAVE fcloaded = $(StringFromList(0, S_waveNames))
+				WAVE rfcloaded = $(StringFromList(1, S_waveNames))
 				
-								
-			fcWaveLoaded = StringFromList(0, S_waveNames)
-			SplitString/E="(\\d+)$" fcWaveLoaded, fcNumLoaded
+				fc[][index] = fcloaded[p]
+				rfc[][index] = rfcloaded[p]
 				
-							
-			if(index!=str2num(fcNumLoaded))
-				duplicate/O $fcWaveLoaded $fcWaveCurrent
-				KillWaves $fcWaveLoaded
-			endif
-			
-				
-			if (V_flag == 1)
-				Note/K $fcWaveCurrent, headerstuff
+				fcmeta[index] = headerstuff
 				// Increment number of successfully read files
 				success += 1
 			else
-				Print fileName + ": less or more than 1 curve read from file"
-			endif
-		endif
-	
-		// RETRACT curves
-		if(dataOffsets[index])
-			GBLoadWave/A=rfc/B/Q/S=(dataOffsets[index]+(2*ksFCPoints))/T={16,4}/U=(ksFCPoints)/W=1 fileName
-			
-			fcWaveCurrent="rfc"+num2str(index)
-				
-			SplitString/E="(.+)\;$" S_waveNames, fcWaveLoaded
-			SplitString/E="\\D+(\\d+)\;$" S_waveNames, fcNumLoaded
-				
-			if(index!=str2num(fcNumLoaded))
-				duplicate/O $fcWaveLoaded $fcWaveCurrent
-				KillWaves $fcWaveLoaded
-			endif
-				
-			if (V_flag == 1)
-				Note/K $fcWaveCurrent, headerstuff
-				//Increment number of successfully read files
-				success += 1
-			else
-				Print fileName + ": less or more than 1 curve read from file"
+				Print "Did not find approach + retract curves at position " + num2str(index)
 			endif
 		endif
 
 		index += 1
 		
 		Prog("ReadWaves",index,totalWaves)
-		
-		if( V_Flag == 2 )	// we only have one button and that means stop
-			break
-		endif		
 		
 	while (index<totalWaves)
 	
@@ -448,7 +416,8 @@ Function ReadAllFCs(fileName)
 	Make/T/O/N=(totalWaves, 2) brushheight_names
 	Make/O/N=(totalWaves) brushheights
 	Make/O/N=(totalWaves) retractfeature
-
+	
+	KillWaves/Z fcload0, fcload1
 
 	return success	
 End
@@ -477,6 +446,7 @@ Function Analysis()
 	wave sel=$selectedCurvesW
 		
 
+	WAVE/T fcmeta
 	make/N=(totalWaves)/O usedtime //DEBUG
 	make/N=(totalWaves)/O usedtimeresult //DEBUG
 	variable zres
@@ -487,21 +457,29 @@ Function Analysis()
 	string header
 	Variable num = 0
 	
+	// Create 2d waves for Analysis
+	Make/N=(ksFCPoints, totalWaves)/O fc_blfit=NaN
+	Make/N=(ksFCPoints/8, totalWaves)/O fc_sensfit=NaN
+	Make/N=(ksFCPoints, totalWaves)/O fc_x_tsd=NaN
+	Make/N=(ksFCPoints, totalWaves)/O fc_expfit=NaN
+	
 	for (i=0; i < totalWaves; i+=1)
 	
 		variable z0=ticks		//DEBUG
 		
 		if(sel[i])
 		
-			string tempw="fc"+num2str(i)
-		
-			WAVE w=$tempw
-		
-			header = note(w)
+			header = fcmeta[i]
 		
 			variable rampSize=numberbykey("rampSize", header)
 			variable VPerLSB=numberbykey("VPerLSB", header)
 			variable springConst=numberbykey("springConst", header)	
+			
+			// Set Z piezo ramp size (x axis)
+			SetScale/I x 0, (rampSize), "nm", fc
+			SetScale/I x 0, (rampSize), "nm", fc_blfit
+			SetScale/I x 0, (rampSize/8), "nm", fc_sensfit
+			SetScale/I x 0, (rampSize), "nm", fc_expfit
 		
 			zres=ticks //DEBUG
 		
@@ -513,10 +491,12 @@ Function Analysis()
 			
 			zfeat=ticks	//DEBUG
 			
-			retractfeature[i]=retractedforcecurvebaselinefit(i, rampSize, VPerLSB, springConst)	//baselinefit for the retracted curves.
 			
 			usedtimefeature[i]=(ticks-zfeat)/60	//DEBUG
 			
+			//retractfeature[i]=retractedforcecurvebaselinefit(i, rampSize, VPerLSB, springConst)	//baselinefit for the retracted curves.
+			retractfeature[i]=1 // until retractedforcecurvebaselinefit is fixed for 2d waves
+		
 			num += 1
 		endif
 		
@@ -1115,15 +1095,27 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	WAVE/T wNames
 	WAVE wHeights
 	
-	String wname = "fc" + num2str(index)
-	WAVE w = $wname
-	String header = note(w)
+	Variable V_fitOptions = 4		// suppress progress window
 	
-	wNames[index][0] = wname
+	WAVE/T fcmeta
+	
+	String header = fcmeta[index]
+	
+	wNames[index][0] = "fc" + num2str(index)
 	wNames[index][1] = StringByKey("fileName", header)
 	
+	WAVE fc
+	WAVE fc_blfit, fc_sensfit, fc_x_tsd, fc_expfit
+	Make/FREE/N=(ksFCPoints) w, blfit, xTSD, expfit
+	Make/FREE/N=(ksFCPoints/8) sensfit
+	
+	// copy data from 2d array to temporary wave. copy back after all analysis
+	w[] = fc[p][index]
+
 	// Set Z piezo ramp size (x axis)
 	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", w
+	
+	String wname = "fc" + num2str(index)
 	
 	// Convert y axis to V
 	w *= NumberByKey("VPerLSB", header)
@@ -1131,10 +1123,8 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	// Fit baseline and subtract from curve
 	CurveFit/NTHR=1/Q line  w[2600,3600]
 	WAVE W_coef
-	Make/N=(ksFCPoints) $(wname + "_blfit")
-	WAVE blfit = $(wname + "_blfit")
 	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", blfit
-	// Save baseline to fc<i>_blfit
+
 	blfit = W_coef[0] + W_coef[1]*x
 	// Subtr. baseline
 	w -= (W_coef[0] + W_coef[1]*x)
@@ -1145,23 +1135,19 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	
 	// Fit deflection sensitivity and change y scale
 	CurveFit/NTHR=1/Q line  w[10,100]
-	Make/N=(ksFCPoints/8) $(wname + "_sensfit")	// display only 4096/8 points
-	WAVE sensfit = $(wname + "_sensfit")
 	SetScale/I x 0, (NumberByKey("rampSize", header)/8), "nm", sensfit
-	// Save fit to fc<i>_sensfit
+
 	sensfit = W_coef[0] + W_coef[1]*x
 	Variable deflSens = -1/W_coef[1]
 	// Add fitted sens. to header data
 	header += "deflSensFit:" + num2str(deflSens) + ";"
-	Note/K w, header
+	fcmeta[index] = header
 	// Change y scale on all curves to nm
 	w *= deflSens
 	blfit *= deflSens
 	sensfit *= deflSens
 	
 	// Create x values wave for tip-sample-distance
-	Make/N=(ksFCPoints) $(wname + "_x_tsd")
-	WAVE xTSD = $(wname + "_x_tsd")
 	// Write displacement x values
 	xTSD = NumberByKey("rampSize", header)/ksFCPoints * p
 	// Subtract deflection to get tip-sample-distance
@@ -1177,6 +1163,12 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	// Shift hard wall contact point to 0 in xTSD
 	WaveStats/R=[10,100]/Q xTSD
 	xTSD -= V_avg
+	
+	// write back curves to 2d wave
+	fc[][index] = w[p]
+	fc_blfit[][index] = blfit[p]
+	fc_sensfit[][index] = sensfit[p]
+	fc_x_tsd[][index] = xTSD[p]
 	
 	// Find start point for exponential fit:
 	// Sliding box average (31 pts) crosses 1 nm
@@ -1194,7 +1186,7 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	
 	// Write start point to header note
 	header += "expFitStartPt:" + num2str(expFitStart) + ";"
-	Note/K w, header
+	fcmeta[index] = header
 	
 	// Find end point for exp fit the same way
 	FindLevel/B=31/EDGE=2/P/Q w, 1
@@ -1212,10 +1204,10 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	endif
 	// Write end point to header note
 	header += "expFitEndPt:" + num2str(expFitEnd) + ";"
-	Note/K w, header
+	fcmeta[index] = header
 	
 	// Fit exponential curve to force-vs-tsd
-	Variable V_fitError
+	Variable V_fitError = 0		// prevent abort on error
 	CurveFit/NTHR=1/Q exp_XOffset w[expFitStart,expFitEnd]/X=xTSD
 	if (V_fitError)
 		Print wname + ": Error doing CurveFit"
@@ -1226,16 +1218,16 @@ Function AnalyseBrushHeight(index, wNames, wHeights)
 	header += "expFitChiSq:" + num2str(V_chisq) + ";"
 	header += "expFitTau:" + num2str(W_coef[2]) + ";"
 	header += "expFitBL:" + num2str(W_coef[0]) + ";"
-	Note/K w, header
+	fcmeta[index] = header
 	
 	WAVE W_fitConstants
-	// Save fit to fc<i>_expfit
-	Make/N=(ksFCPoints) $(wname + "_expfit")
-	WAVE expfit = $(wname + "_expfit")
 	// Set scale to match the tsd x scale
-	SetScale/I x 0, (xTSD[numpnts(xTSD)-1]), "nm", expfit
+	SetScale/I x 0, (NumberByKey("rampsize", header)), "nm", expfit
 	SetScale d 0, 0, "pN", expfit
 	expfit = W_coef[0]+W_coef[1]*exp(-(x-W_fitConstants[0])/W_coef[2])
+	
+	// write back curves to 2d wave
+	fc_expfit[][index] = expfit[p]
 	
 	// Point in FC where force is 1 pN higher than expfit baseline
 	// equals brush start (defined arbitrarily)
@@ -1399,20 +1391,18 @@ End
 Function plot2(idx)
 	Variable idx
 	
-	String wName = "fc" + num2str(idx)
-	WAVE w = $wName
-	WAVE wx = $(wName + "_x_tsd")
-	WAVE wf = $(wName + "_expfit")
+	WAVE fc, fc_x_tsd, fc_expfit
 	
-	Display w vs wx
-	AppendToGraph/W=$S_name wf
+	Display/K=1 fc[][idx] vs fc_x_tsd[][idx]
+	AppendToGraph/W=$S_name fc_expfit[][idx]
 	ModifyGraph rgb[0]=(0,15872,65280) 
 
 	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
 	Label left "\\Z13force (pN)"
 	Label bottom "\\Z13tip-sample distance (nm)"
 	SetAxis left -25,270
-	SetAxis bottom -1,75
+	SetAxis bottom -5,75
+	ModifyGraph zero=8
 	
 	ShowInfo
 End
