@@ -367,11 +367,29 @@ Function ChooseForceCurves()
 	string/G totalpath, selectedCurvesW = "selectedcurves"
 	variable/G isMapLoaded
 	if (isMapLoaded==1)
-		if(waveexists($selectedCurvesW))
-			KillWaves $selectedCurvesW
+		Variable del = 1
+		WAVE/Z sel = $selectedCurvesW
+		if (WaveExists(sel) && (numpnts(sel) == ksFVRowSize*ksFVRowSize))
+			WaveStats/Q sel
+			if (V_npnts > 0)
+				// Some pixels were previously already selected. Keep?
+				DoAlert 1, "Keep previous selection?"
+				if (V_flag == 1)
+					del = 0
+				endif
+			endif
 		endif
 		
-		Make/N=(ksFVRowSize*ksFVRowSize)/O $selectedCurvesW
+		if (del == 1)
+			Make/N=(ksFVRowSize*ksFVRowSize)/O $selectedCurvesW = NaN
+			
+			// Delete markers from image graph if exists
+			String/G imagegraph
+			DoWindow $imagegraph
+			if (V_flag > 0)
+				DrawAction/W=$imagegraph delete
+			endif
+		endif
 			
 		ChooseFVs()
 	else
@@ -383,18 +401,16 @@ End
 
 
 Function ChooseFVs()
-	string/G imagename
+	string/G imagegraph
 	PauseUpdate; Silent 1		// building window...
 	NewPanel/N=Dialog/W=(225,105,525,305) as "Dialog"
-	AutoPositionWindow/M=0/R=$imagename
+	AutoPositionWindow/M=0/R=$imagegraph
 	Button done,pos={119,150},size={50,20},title="Done"
 	Button done,proc=DialogDoneButtonProc
 	Button sall, pos={119,100},size={50,20},title="All"
 	Button sall,proc=selectall
-	TitleBox warning,pos={131,83},size={20,20},title=""
-	TitleBox warning,anchor=MC,fColor=(65535,16385,16385)
 	
-	DoWindow/F $imagename
+	DoWindow/F $imagegraph
 	SetWindow kwTopWin,hook(choose)= chooser
 End
 
@@ -415,50 +431,35 @@ End
 
 Function chooser(s)
 	STRUCT WMWinHookStruct &s
-	Variable rval= 0
-	variable mouseloc,xval,yval, xbla,ybla,fcn
-	string/G imagename, selectedCurvesW
+	Variable rval = 0
+	string/G imagegraph, selectedCurvesW
 	String/G headerstuff
 
-	switch(s.eventCode)
-		case 3:
-			yval=s.mouseLoc.v
-			xval=s.mouseLoc.h
+	// React only on left mousedown
+	if ((s.eventCode == 3) && (s.eventMod & 1 != 0))
+		Variable mouseY = s.mouseLoc.v
+		Variable mouseX = s.mouseLoc.h
 
+		// Get image pixel and force curve number
+		Variable pixelY = round(axisvalfrompixel(imagegraph, "left", mouseY-s.winrect.top))
+		Variable pixelX = round(axisvalfrompixel(imagegraph, "bottom", mouseX-s.winrect.left))
+		Variable fcnum = pixelX+(pixelY*ksFVRowSize)
 
-			ybla=axisvalfrompixel(imagename,"left",yval-s.winrect.top)
-			xbla=axisvalfrompixel(imagename,"bottom",xval-s.winrect.left)
+		if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1))
+			// Draw marker on top of pixel
+			SetDrawEnv xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
+			DrawRect pixelX/ksFVRowSize+0.3/ksFVRowSize, 1-pixelY/ksFVRowSize-0.3/ksFVRowSize,  pixelX/ksFVRowSize+0.7/ksFVRowSize, 1-pixelY/ksFVRowSize-0.7/ksFVRowSize
+			
+			// Write selected fc offset to selection wave
+			Variable offs = NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*fcnum*2
+			WAVE sel=$selectedCurvesW
+			
+			sel[fcnum] = offs
+			print "X: " + num2str(pixelX) + "; Y: " + num2str(pixelY) + "; FC: ", num2str(fcnum)
+		endif
 
-			Variable xblar =  round(xbla)
-			Variable yblar =  round(ybla)
-
-			SetDrawEnv xcoord= prel,ycoord=prel, linethick=0, fillfgc=(65280,0,0);DelayUpdate
-			DrawRect xblar/ksFVRowSize+0.3/ksFVRowSize, 1-yblar/ksFVRowSize-0.3/ksFVRowSize,  xblar/ksFVRowSize+0.7/ksFVRowSize, 1-yblar/ksFVRowSize-0.7/ksFVRowSize
-
-			fcn=xblar+(yblar*ksFVRowSize)
-
-			print "fcn: ",fcn
-
-			Variable offs = NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*fcn*2
-
-			wave sel=$selectedCurvesW
-
-			print xblar, yblar
-
-			if(xblar>=0 && xblar<=(ksFVRowSize-1) && yblar>=0 && yblar<=(ksFVRowSize-1))
-
-				sel[fcn] = offs
-
-				print "offset read: ", offs
-
-			else
-
-				print "Out of Range"
-			endif
-
-			rval= 1
-
-	EndSwitch
+		rval = 1
+	endif
 
 	return rval
 
@@ -470,12 +471,12 @@ End
 Function DialogDoneButtonProc(ba) : ButtonControl
 	STRUCT WMButtonAction &ba
 	
-	string/G imagename, totalpath
+	string/G imagegraph, totalpath
 
 	switch( ba.eventCode )
 		case 2:									// mouse up
 			// turn off the chooser hook
-			SetWindow $imagename,hook(choose)= $""
+			SetWindow $imagegraph,hook(choose)= $""
 			// kill the window AFTER this routine returns
 			Execute/P/Q/Z "DoWindow/K "+ba.win
 			ReadAllFCs(totalpath)
