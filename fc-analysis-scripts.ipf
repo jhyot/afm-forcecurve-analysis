@@ -57,6 +57,7 @@ Menu "Force Map Analysis"
 	"Load Image", LoadImage()
 	"Show Image", ImageToForeground()
 	"Show Height Map", MapToForeground()
+	"Review All Curves", ReviewCurvesMenu()
 End
 
 
@@ -890,158 +891,206 @@ Function ReadFCHeaderLines(fileName)
 End
 
 
+Function ReviewCurvesMenu()
+	Variable/G isMapLoaded
 	
+	if (isMapLoaded != 1)
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
 	
+	Variable totalwaves = ksFVRowSize * ksFVRowSize
 	
+	// Create accept and reject waves
+	Make/N=(totalWaves)/O heights_acc = NaN
+	Make/N=(totalWaves)/O heights_rej = NaN
 	
-
-	
-	
-
-	
-	
-
-	
-	
- 
-	
-	
-	
-	
-
-	
-		
-
-		
-			
-			
-			
-			
+	ReviewCurves("brushheights", "heights_acc", "heights_rej")
+End
 
 
 // Interactive review of force curves and curve fits
 // Displays curves one by one and allows the user
 // to accept or reject a given curve + fit.
-// Rejected curve names and brush heights are
-// moved to separate waves
-// Expects following parameters:
-// String names: name of wave filled with curve names to be reviewed
-// String heights: name of wave filled with corresponding brush heights
-// Rejected names and heights are moved to waves with same names but "_del" appended
-// "names" wave is 2D with names[i][0] being the FC wave name,
-// names[i][1] is the original filename of the curve
-Function ReviewCurves(names, heights)
-	String names, heights
+// Accepted and rejected heights are copied to separate waves
+//
+// Input and output waves must exist.
+// Output waves will not be deleted, but a value is overwritten once a curve at that position
+// has been accepted or rejected.
+Function ReviewCurves(inputWname, accWname, rejWname)
+	String inputWname	// input wave of brush heights
+	String accWname		// output wave of accepted brush heights
+	String rejWname		// output wave of rejected brush heights
 	
-	WAVE/T wNames = $names
-	WAVE wHeights = $heights
+	String/G selectedCurvesW
+	
+	WAVE inputw = $inputWname
+	WAVE accw = $accWname
+	WAVE rejw = $rejWname
+	
+	WAVE fc
+	WAVE fc_x_tsd
+	WAVE fc_expfit
+	WAVE/T fcmeta
+	
+	WAVE sel = $selectedCurvesW
 
-	Variable total = numpnts(wHeights)
-	Variable deleted = 0
-	
-	// Create waves for rejected curves
-	if (WaveExists($(names + "_del")))
-		KillWaves $(names + "_del")
-	endif
-	if (WaveExists($(heights + "_del")))
-		KillWaves $(heights + "_del")
-	endif
-	Make/T/O/N=(total,2) $(names + "_del")
-	Make/O/N=(total) $(heights + "_del")
-	
-	WAVE/T wNamesDel = $(names + "_del")
-	WAVE wHeightsDel = $(heights + "_del")
-	
+	Variable totalall = numpnts(inputw)
+	Variable totalsel = 0
+		
 	Variable i
-	String wname, header, shortHeader
-	Variable totalTmp = total
 	
-	// Create and change to temporary data folder
-	// for the duration of the review
-	NewDataFolder/O root:tmp_reviewDF
+	// count how many points were selected
+	for (i=0; i < totalall; i+=1)
+		if (sel[i])
+			totalsel += 1
+		endif
+	endfor
 	
-	for (i=0; i < totalTmp; i+=1)
-		wname = wNames[i][0]
-		WAVE w = $wname
-		WAVE xTSD = $(wname + "_x_tsd")
-		WAVE expfit = $(wname + "_expfit")
-		
-		header = note(w)
-		
-		// Display current force vs tip-sample distance and exponential fit
-		DoWindow/K tmp_reviewgraph
-		Display/N=tmp_reviewgraph w vs xTSD
-		AppendToGraph expfit
-		ModifyGraph rgb[0]=(0,15872,65280) 
-		ShowInfo
-		
-		Variable/G root:tmp_reviewDF:rejected = 0
-		
-		// Create and show dialog window
-		// with Accept, Zoom and Reject buttons
-		// and some header data about current curve
-		NewPanel/K=2 /W=(300,300,600,600) as "Accept or reject curve?"
-		DoWindow/C tmp_reviewDialog
-		AutoPositionWindow/E/M=0/R=tmp_reviewgraph
-		
-		shortHeader = "Name: " + wNames[i][1] + " (" + wNames[i][0] + ")\r"
-		shortHeader += "FitStart: " + StringByKey("expFitStartPt", header) + "\r"
-		shortHeader += "FitEnd: " + StringByKey("expFitEndPt", header) + "\r"
-		shortHeader += "FitTau: " + StringByKey("expFitTau", header) + "\r"
-		shortHeader += "FitBL: " + StringByKey("expFitBL", header) + "\r"
-		shortHeader += "BrushHeight: " + num2str(wHeights[i])
-		DrawText 20, 100, shortHeader
-		
-		Button button0,pos={30,120},size={100,40},title="Accept"
-		Button button0,proc=ReviewCurves_Accept
-		Button button1,pos={30,165},size={100,40}
-		Button button1,proc=ReviewCurves_Zoom,title="Zoom"
-		Button button2,pos={30,215},size={100,40},title="Reject"
-		Button button2,proc=ReviewCurves_Reject
+	String header, shortHeader, numtext
+	Variable curvesdone = 0
+	
+	// Create temporary data folder for the duration of the review
+	NewDataFolder/O tmp_reviewDF
+	
+	// default zoom level 1 (0: autoscale; 1,2 increasing zoom)
+	Variable/G :tmp_reviewDF:defzoom = 1
+	
+	for (i=0; i < totalall; i+=1)
+		if (sel[i])
+			curvesdone += 1
+			
+			header = fcmeta[i]
 
-		// Wait for user interaction (ends when dialog window is killed)
-		PauseForUser tmp_reviewDialog, tmp_reviewgraph
+			DoWindow/K tmp_reviewgraph
+			PlotFC(i)
+			DoWindow/C tmp_reviewgraph
+			
+			NVAR defzoom = :tmp_reviewDF:defzoom
+			Variable/G :tmp_reviewDF:zoom = defzoom
+			PlotFC_setzoom(defzoom)
+			
+			Variable/G :tmp_reviewDF:choice = 0
+	
+			// Create and show dialog window
+			// with Accept/Reject etc. buttons
+			// and some header data about current curve
+			NewPanel/K=2 /W=(300,300,600,600) as "Accept or reject curve?"
+			DoWindow/C tmp_reviewDialog
+			AutoPositionWindow/E/M=0/R=tmp_reviewgraph
+			
+			shortHeader = "FCNum: " + num2str(i)
+			shortHeader += "; X: " + num2str(mod(i,ksFVRowSize)) + "; Y: " + num2str(floor(i/ksFVRowSize)) + "\r"
+			shortHeader += "FitStart: " + StringByKey("expFitStartPt", header) + "\r"
+			shortHeader += "FitEnd: " + StringByKey("expFitEndPt", header) + "\r"
+			shortHeader += "FitTau: " + StringByKey("expFitTau", header) + "\r"
+			shortHeader += "FitBL: " + StringByKey("expFitBL", header) + "\r"
+			shortHeader += "BrushHeight: " + num2str(inputw[i])
+			DrawText 20, 100, shortHeader
+			
+			Button accb,pos={30,120},size={100,40},title="Accept"
+			Button accb,proc=ReviewCurves_Button			
+			Button rejb,pos={135,120},size={100,40},title="Reject"
+			Button rejb,proc=ReviewCurves_Button
+			
+			Button zoomb,pos={30,165},size={100,40},title="Zoom"
+			Button zoomb,proc=ReviewCurves_Button
+			Button unzoomb,pos={135,165},size={100,40},title="Unzoom"
+			Button unzoomb,proc=ReviewCurves_Button
+			PopupMenu defzoompop,pos={240,180},mode=(defzoom+1),value="0;1;2;"
+			PopupMenu defzoompop,proc=ReviewCurves_ChgDefzoom
+						
+			Button redob,pos={30,220},size={100,40},title="Redo last"
+			Button redob,proc=ReviewCurves_Button
 
-		// Will be set to 1 if user pressed Reject button in review dialog
-		NVAR gRej = root:tmp_reviewDF:rejected
-		Variable rej = gRej
-		
-		// If rejected, copy the name and brush height of the curve to _del waves
-		// then delete the curve from original wave
-		if (rej)
-			wNamesDel[deleted][0] = wNames[i][0]
-			wNamesDel[deleted][1] = wNames[i][1]
-			wHeightsDel[deleted] = wHeights[i]
-			DeletePoints i, 1, wNames, wHeights
-			deleted += 1
-			i -= 1
-			totalTmp -= 1
+			if (curvesdone <= 1)
+				Button redob,disable=2
+			endif
+			
+			numtext = num2str(curvesdone) + "/" + num2str(totalsel)
+			DrawText 200, 260, numtext
+			
+			// Wait for user interaction (ends when dialog window is killed)
+			PauseForUser tmp_reviewDialog, tmp_reviewgraph
+	
+			// gChoice==1 for accepted, 2 for rejected
+			NVAR gChoice = :tmp_reviewDF:choice
+			Variable val = gChoice
+			
+			switch(val)
+				case 1:
+					// accepted
+					accw[i] = inputw[i]
+					rejw[i] = NaN
+					break
+				case 2:
+					// rejected
+					rejw[i] = inputw[i]
+					accw[i] = NaN
+					break
+				case 3:
+					// redo last
+					Variable j
+					for (j=i-1; j>=0; j-=1)
+						if (sel[j])
+							i = j-1
+							curvesdone -= 2
+							break
+						endif
+					endfor
+					break
+				default:
+					print "User interaction error (neither accepted nor rejected curve " + num2str(i) + ")"
+					break
+			endswitch
 		endif
 	endfor
 	
 	DoWindow/K tmp_reviewgraph
-	KillDataFolder root:tmp_reviewDF
+	KillDataFolder tmp_reviewDF
 	
-	Print "Review curves: " + num2str(deleted) + "/" + num2str(total) + " curves rejected."
-	
+	WaveStats/Q accw
+	Variable acc = V_npnts
+	WaveStats/Q rejw
+	Variable rej = V_npnts
+	Print "Reviewed " + num2str(totalsel) + " selected out of " + num2str(totalall) + " total curves"
+	Print "Accepted " + num2str(acc) + "/" + num2str(totalsel) + "; rejected " + num2str(rej) + "/" + num2str(totalsel)	
 End
 
-Function ReviewCurves_Accept(ctrlName) : ButtonControl
+Function ReviewCurves_Button(ctrlName)
 	String ctrlName
-	DoWindow/K tmp_reviewDialog			// Kill self
-End
 
-Function ReviewCurves_Reject(ctrlName) : ButtonControl
-	String ctrlName
-	Variable/G root:tmp_reviewDF:rejected = 1
-	DoWindow/K tmp_reviewDialog		// Kill self
-End
-
-Function ReviewCurves_Zoom(ctrlName) : ButtonControl
-	String ctrlName
+	NVAR zoom = :tmp_reviewDF:zoom
 	
-	SetAxis/W=tmp_reviewgraph left, -30, 150
-	SetAxis/W=tmp_reviewgraph bottom, -5, 50
+	strswitch (ctrlName)
+		case "accb":
+			Variable/G :tmp_reviewDF:choice = 1
+			DoWindow/K tmp_reviewDialog			// Kill self
+			break
+		case "rejb":
+			Variable/G :tmp_reviewDF:choice = 2
+			DoWindow/K tmp_reviewDialog			// Kill self
+			break
+		case "redob":
+			Variable/G :tmp_reviewDF:choice = 3
+			DoWindow/K tmp_reviewDialog			// Kill self
+			break
+		case "zoomb":
+			zoom = (zoom==0 ? 1 : 2)
+			PlotFC_setzoom(zoom)
+			break
+		case "unzoomb":
+			zoom = 0
+			PlotFC_setzoom(zoom)
+			break
+	endswitch
+End
+
+Function ReviewCurves_ChgDefzoom(ctrlName, popnum, popstr)
+	String ctrlName, popstr
+	Variable popnum
+	
+	Variable/G :tmp_reviewDF:defzoom = popnum-1
 End
 
 
