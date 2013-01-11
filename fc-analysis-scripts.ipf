@@ -94,12 +94,20 @@ End
 Function LoadForceMap()
 
 	String/G totalpath
+	
 	Variable/G isMapLoaded = 0
 
 	Variable result = 0
 	Variable fileref = 0
 	
-	Open/D/R/M="Open Veeco Force Volume Experiment File"/F="All Files:.*;" fileref
+	if (WaveExists($"fc"))
+		DoAlert 1, "Another force map detected in current data folder\rContinuing will overwrite old waves, OK?"
+		if (V_flag == 2)
+			return -1
+		endif
+	endif
+	
+	Open/D/R/M="Open Force Volume Experiment File"/F="All Files:.*;" fileref
 	
 	if (cmpstr(S_fileName, "") == 0)
 		print "No file selected"
