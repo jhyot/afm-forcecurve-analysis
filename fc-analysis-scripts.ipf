@@ -8,13 +8,10 @@
 
 
 // TODO
-// Code style
-// Quasi-height image, load byte offset from header
-// rewrite(style, variable names) chooser, inspector and rinspector functions (possibly refactor)
+// LoadImage() or similar for quasi-height image
 // retraction curve handling (make optional, variable names etc)
-// general variable names ("bla", "temp" etc)
-// use free waves (when temp waves needed)
 // Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
+// Make button in heightimage and heightmap for inspect mode (i.e. be able to turn off inspect mode)
 
 
 // **** USER CONFIGURABLE CONSTANTS ****
