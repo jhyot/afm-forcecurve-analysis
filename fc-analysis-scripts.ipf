@@ -306,7 +306,7 @@ End
 
 // Reads header from FV file and stores it in a global variable.
 // Reads and displays image (quasi-topography) from FV file.
-// Also kills previous force volume related files in current data folder.
+// Overwrites previous force volume related files in current data folder.
 //
 // Returns 0 if no errors, -1 otherwise
 Function ReadMap(fileName)
@@ -317,46 +317,41 @@ Function ReadMap(fileName)
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
 	String headerData, image
-	String/G imagewave, imagename
+	String/G imagewave, imagegraph
 	
-
-	// IMPORTANT: will delete all previous waves in the current data folder starting with "fc"
-	// Make sure that the waves are not in use anymore (i.e. close graphs etc.)
-	KillPreviousWaves()
 	
 	// Read and parse FC file header
-	result = ParseFCHeader(fileName, headerData)
+	result = ParseFCHeader(fileName, "fullHeader", "subGroupTitles", headerData)
 	
 	if (result < 0)
-		print "Could not parse header correctly"
+		print "Could not parse force volume header correctly"
 		return -1
 	endif
 	
 	String/G headerstuff=headerData
-
-	GBLoadWave/Q/B/N=image/T={16,4}/S=(NumberByKey("dataOffset", headerData)-2*totalWaves)/W=1/U=(totalWaves) fileName
 	
-	if (V_flag < 1)
-		print "Could not load force volume image data"
+	String imagemeta = ""
+	result = ParseImageHeader(fileName, "imageheader", "imagetitles", imagemeta)
+	
+	if (result <= 0)
+		print "Could not parse height image header correctly"
 		return -1
 	endif
-
-	imagewave = StringFromList(0,S_waveNames)
-	redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
+	
+	// Load by default first image in force volume file.
+	// Assuming this is always the quasi-height image.
+	result = LoadImageFromFile(filename, 0, imagemeta)
+	if (result != 0)
+		print "Could not load FV image data"
+		return -1
+	endif
 
 	// Create waves for holding the curves (2d array, 1 column per curve)
 	// and for metadata about each curve (1 row per curve)
 	Make/O/N=(ksFCPoints, totalWaves) fc=NaN, rfc=NaN
 	Make/T/O/N=(totalWaves) fcmeta=""
 
-	Display/W=(29.25,55.25,450.75,458)
-	AppendImage $imagewave
-
-	imagename=S_name
-
-	ModifyImage $imagewave ctab={*,*,Gold,0}
-
-	DoUpdate
+	ShowImage()
 
 End
 
@@ -494,10 +489,10 @@ Function ReadAllFCs(fileName)
 	Variable index=0
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
-	String/G headerstuff, imagename, selectedCurvesW
+	String/G headerstuff, imagegraph, selectedCurvesW
 
 	
-	DoWindow/F $imagename	// Bring graph to front
+	DoWindow/F $imagegraph	// Bring graph to front
 	if (V_Flag == 0)			// Verify that graph exists
 		Abort "UserCursorAdjust: No such graph."
 		return -1
@@ -536,24 +531,16 @@ Function ReadAllFCs(fileName)
 		
 	while (index<totalWaves)
 	
-	printf "Elapsed time: %g seconds\r",(ticks-t0)/60
+	printf "Elapsed time: %g seconds\r",round(10*(ticks-t0)/60)/10
 
 	// Create 2 waves
 	// One holds file and wave names, the other the corresponding brush heights
-	// Value will be filled in in AnalyseBrushHeight
+	// Value will be filled in AnalyseBrushHeight
 	// Old waves will be overwritten
-	if (WaveExists(brushheight_names))
-		KillWaves brushheight_names
-	endif
-	if (WaveExists(brushheights))
-		KillWaves brushheights
-	endif
-	if (WaveExists(retractfeature))
-		KillWaves retractfeature
-	endif
-	Make/T/O/N=(totalWaves, 2) brushheight_names
-	Make/O/N=(totalWaves) brushheights
-	Make/O/N=(totalWaves) retractfeature
+	// (same for retractfeature)
+	Make/T/O/N=(totalWaves, 2) brushheight_names = {"", ""}
+	Make/O/N=(totalWaves) brushheights = NaN
+	Make/O/N=(totalWaves) retractfeature = NaN
 	
 	KillWaves/Z fcload0, fcload1
 
@@ -645,6 +632,30 @@ Function inspector(s)			//heightsmap
 End
 
 
+// Extracts section titles (e.g. "\*Ciao scan list") from the header
+// and saves them into new text wave (titleswave).
+// Also creates wave W_Index with the positions of the section titles within full header
+//
+// Returns 0 if success, < 0 if error.
+Function GetHeaderSectionTitles(headerwave, titleswave)
+	String headerwave		// Name of the text wave with the header lines (must exist and be populated)
+	String titleswave		// Name of the text wave where the section titles will be written to (will be overwritten)
+	
+	Make/T/O/N=0 $titleswave
+
+	WAVE/T fullHeader = $headerwave
+	WAVE/T subGroupTitles = $titleswave
+	
+	// Find indices of header subgroups (e.g. "\*Ciao scan list")
+	// in fullHeader (created by ReadFCHeaderLines)
+	Grep/INDX/E="^\\\\\\*.+$" fullHeader as subGroupTitles
+	if (V_flag != 0)
+		return -1			// Error
+	endif
+	
+	return 0	
+End
+
 
 
 // Read and parse FC file given by fileName
@@ -658,36 +669,31 @@ End
 // VPerLSB			Vertical deflection V/LSB
 // deflSens			Deflection sensitivity nm/V
 // springConst		Spring constant nN/nm
-Function ParseFCHeader(fileName, headerData)
+Function ParseFCHeader(fileName, headerwave, titleswave, headerData)
 	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
+	String headerwave		// Name of the text wave where full header will be saved to (will be overwritten)
+	String titleswave		// Name of the text wave where the section titles will be written to (will be overwritten)
 	String &headerData		// Pass-by-ref string will be filled with header data
 	
 	Variable result, subGroupOffset
 	headerData = ""
 	
 	
-	result = ReadFCHeaderLines(fileName)
+	result = ReadFCHeaderLines(fileName, headerwave)
 	if (result != 0)
-		Print fileName + ": Did not find header end\r"
+		Print fileName + ": Did not find header end"
 		return -1
 	endif
 	
-	if (WaveExists(subGroupTitles))
-		KillWaves subGroupTitles
+	result = GetHeaderSectionTitles(headerwave, titleswave)
+	if (result != 0)
+		print fileName + ": Could not extract sections from header"
+		return -1
 	endif
-	Make/T/O/N=0 subGroupTitles		// Will contain the grepped subgroup titles
-
-	WAVE/T fullHeader
-	WAVE/T subGroupTitles
 	
-	// Find indices of header subgroups (e.g. "\*Ciao scan list")
-	// in fullHeader (created by ReadFCHeaderLines)
-	Grep/INDX/E="^\\\\\\*.+$" fullHeader as subGroupTitles
+	WAVE/T fullHeader = $headerwave
+	WAVE/T subGroupTitles = $titleswave
 	WAVE W_Index
-	if (V_flag != 0)
-		Print fileName + ": Error grepping subgroup titles"
-		return -1			// Error
-	endif
 	
 	
 	// ============================
@@ -703,7 +709,7 @@ Function ParseFCHeader(fileName, headerData)
 	
 	// Check if correct version and filetype
 	String s
-	FindValue/S=(subGroupOffset)/TEXT="\\Version:" fullHeader
+	FindValue/S=(subGroupOffset)/TEXT="\\Version:" fullheader
 	if (V_value < 0)
 		Print filename + ": Version not found"
 		return -1
@@ -733,7 +739,7 @@ Function ParseFCHeader(fileName, headerData)
 	endif
 	subGroupOffset = W_Index[V_value]
 	
-		// Get data offset
+	// Get data offset
 	FindValue/S=(subGroupOffset)/TEXT="\Data offset:" fullHeader
 	if (V_value < 0)
 		Print filename + ": Data offset not found"
@@ -784,12 +790,17 @@ Function ParseFCHeader(fileName, headerData)
 	headerData += "springConst:" + s + ";"
 	
 	// Get vertical deflection V/LSB
-	FindValue/S=(subGroupOffset)/TEXT="\\@4:Z scale: V [Sens. DeflSens]" fullHeader
+	FindValue/S=(subGroupOffset)/TEXT="\\@4:Z scale: V" fullHeader
 	if (V_value < 0)
 		Print filename + ": Z scale not found"
 		return -1
 	endif
-	SplitString/E="\\((.+)\\sV/LSB\\)" fullHeader[V_value], s
+	String s2
+	SplitString/E="\\[(.+)\\]\\s\\((.+)\\sV/LSB\\)" fullHeader[V_value], s2, s
+	if (cmpstr(s2, "Sens. DeflSens") != 0)
+		Print filename + ": FC data is not vertical deflection (" + s2 + ")"
+		return -1
+	endif
 	if (strlen(s) == 0)
 		Print filename + ": V/LSB invalid"
 		return -1
@@ -841,14 +852,175 @@ Function ParseFCHeader(fileName, headerData)
 End
 
 
+// Parses image header and stores values in headerData string (pass by ref)
+// headerData content:
+// offset1,length1,bytes1,scale1;offset2,length2,bytes2,scale2;...
+// offset: start of image in bytes
+// length: length of image data in bytes
+// bytes: bytes per pixel
+// scale: nm/LSB (least significant bit), height scale of image
+//
+// If one image could not be parsed, headerData will just have "-" in it's place
+//
+// Returns number of successfully parsed images within the file
+Function ParseImageHeader(fileName, headerwave, titleswave, headerData)
+	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
+	String headerwave		// Name of the text wave where full header will be saved to (will be overwritten)
+	String titleswave		// Name of the text wave where the section titles will be written to (will be overwritten)
+	String &headerData		// Pass-by-ref string will be filled with header data
+	
+	Variable result
+	headerData = ""
+
+	Variable success = 0
+	
+	result = ReadFCHeaderLines(fileName, headerwave)
+	if (result != 0)
+		Print fileName + ": Did not find header end"
+		return success
+	endif
+	
+	result = GetHeaderSectionTitles(headerwave, titleswave)
+	if (result != 0)
+		print fileName + ": Could not extract sections from header"
+		return success
+	endif
+	
+	WAVE/T fullHeader = $headerwave
+	WAVE/T subGroupTitles = $titleswave
+	WAVE W_Index
+	
+	Variable subGroupOffset
+	String s
+	
+	// Get Z piezo sensitivity (only 1 value per file)
+	FindValue/TEXT="\\*Scanner list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		Print filename + ": \\*Scanner list not found"
+		return success
+	endif
+	subGroupOffset = W_Index[V_value]
+	
+	FindValue/S=(subGroupOffset)/TEXT="\\@Sens. Zsens:" fullHeader
+	if (V_value < 0)
+		Print filename + ": Z piezo sens. not found"
+		return success
+	endif
+	SplitString/E=":\\sV\\s(.+)\\snm/V$" fullHeader[V_value], s
+	if (strlen(s) == 0)
+		Print filename + ": Z piezo sens. invalid"
+		return success
+	endif
+	
+	Variable zsens = str2num(s)
+
+	Variable start = 0
+	Variable num = 0
+
+	String currentHeader
+	Variable bpp
+	
+	// Loop over image sections in file
+	do
+		if (start >= numpnts(subGroupTitles))
+			// Reached end of header
+			break
+		endif
+		
+		// Find image section
+		FindValue/S=(start)/TEXT="\\*Ciao image list"/TXOP=4 subGroupTitles
+		if (V_value < 0)
+			// No more images in this file
+			break
+		endif
+	
+		start = V_value + 1
+		subGroupOffset = W_Index[V_value]
+		
+		// Get data offset
+		FindValue/S=(subGroupOffset)/TEXT="\\Data offset:" fullHeader
+		if ((V_value < 0) || ((start < numpnts(W_Index)) && (V_value >= W_Index[start])))
+			Print filename + ": Data offset not found for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		SplitString/E=":\\s(.+)$" fullHeader[V_value], s
+		if (str2num(s) <= 0)
+			Print filename + ": Data offset <= 0 for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		currentHeader = s + ","
+		
+		
+		// Get data length
+		FindValue/S=(subGroupOffset)/TEXT="\\Data length:" fullHeader
+		if ((V_value < 0) || ((start < numpnts(W_Index)) && (V_value >= W_Index[start])))
+			Print filename + ": Data length not found for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		SplitString/E=":\\s(.+)$" fullHeader[V_value], s
+		if (str2num(s) <= 0)
+			Print filename + ": Data length <= 0 for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		currentHeader += s + ","
+		
+		
+		// Get bytes per pixel
+		FindValue/S=(subGroupOffset)/TEXT="\\Bytes/pixel:" fullHeader
+		if ((V_value < 0) || ((start < numpnts(W_Index)) && (V_value >= W_Index[start])))
+			Print filename + ": Bytes/pixel not found for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		SplitString/E=":\\s(.+)$" fullHeader[V_value], s
+		if (str2num(s) <= 0)
+			Print filename + ": Bytes/pixel <= 0 for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		bpp = str2num(s)
+		currentHeader += s + ","
+		
+		
+		// Get height scale
+		FindValue/S=(subGroupOffset)/TEXT="\\@2:Z scale: V [Sens. Zsens]" fullHeader
+		if ((V_value < 0) || ((start < numpnts(W_Index)) && (V_value >= W_Index[start])))
+			Print filename + ": Z scale not found for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		SplitString/E="\\)\\s(.+)\\sV$" fullHeader[V_value], s
+		//SplitString/E="\\((.+)\\sV/LSB\\)" fullHeader[V_value], s
+		if (strlen(s) == 0)
+			Print filename + ": Z scale invalid for image " + num2str(num)
+			headerData += "-;"
+			continue
+		endif
+		currentHeader += num2str(zsens*str2num(s)/(2^(bpp*8)))
+		
+		headerData += currentHeader + ";"
+		success += 1
+		
+		num += 1
+		
+	while (1)
+	
+	return success
+
+End
+
 // Read FC file given by fileName.
-// Add all lines into a new text wave (fullHeader)
+// Add all lines into a new text wave
 // return 0 if end of header found (defined by ksHeaderEnd)
 // -1 otherwise.
-// Last line of header not included in fullHeader.
-// CR (\r) is at end of each line in the wave.
-Function ReadFCHeaderLines(fileName)
-	String fileName			// Full Igor-style path to filename ("folder:to:file.ext")
+// Last line of header not included in header wave.
+Function ReadFCHeaderLines(filename, headerwave)
+	String filename			// Full Igor-style path to filename ("folder:to:file.ext")
+	String headerwave		// Name of the text wave for header data (will be overwritten)
 	
 	Variable result = -1			// Set to 0 if end of header found
 	
@@ -862,7 +1034,8 @@ Function ReadFCHeaderLines(fileName)
 		return -1						// Error
 	endif
 
-	Make/T/O/N=0 fullHeader		// Make new text wave, overwrite old if needed
+	Make/T/O/N=0 $headerwave		// Make new text wave, overwrite old if needed
+	WAVE/T fullheader=$headerwave
 	
 	Variable len
 	String buffer
@@ -876,13 +1049,13 @@ Function ReadFCHeaderLines(fileName)
 			break										// No more lines to be read
 		endif
 		
-		if (cmpstr(buffer, ksHeaderEnd) == 0)
+		if (cmpstr(buffer[0,len-2], ksHeaderEnd) == 0)
 			result = 0								// End of header reached
 			break
 		endif
 		
-		Redimension/N=(line+1) fullHeader		// Add one more row to wave
-		fullHeader[line] = buffer[0,len-2]		// Add line to wave, omit trailing CR char
+		Redimension/N=(line+1) fullheader		// Add one more row to wave
+		fullheader[line] = buffer[0,len-2]		// Add line to wave, omit trailing CR char
 
 		line += 1
 	while (1)
