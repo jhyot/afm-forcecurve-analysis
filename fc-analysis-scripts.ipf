@@ -48,6 +48,7 @@ Menu "Force Map Analysis"
 	"Choose Force Curves/2", ChooseForceCurves()
 	"Do Analysis/3", Analysis()
 	"Load and Analyse All FCs/4", LoadandAnalyseAll()
+	"Load Image", LoadImage()
 End
 
 
@@ -130,7 +131,132 @@ End
 
 
 
-// Kills all waves in the current data folder starting with fc
+Function LoadImage()
+	
+	Variable/G isMapLoaded
+	
+	if (isMapLoaded != 1)
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
+	
+	// Get filename
+	Open/D/R/M="Open Image File"/F="All Files:.*;" fileref
+	
+	if (cmpstr(S_fileName, "") == 0)
+		print "No file selected"
+		return -1
+	endif
+	
+	String filename = S_fileName
+		
+	// Get image metadata
+	// Offsets(a), lengths(b), bytes(c), scaling(d) in header: "a0,b0,c0,d0;a1,b1,c1,d1;..."
+	String header = ""
+	Variable result = ParseImageHeader(filename, "imageheader", "imagetitles", header)
+	
+	if (result <= 0)
+		print "Error parsing image header(s)"
+		return -1
+	endif
+	
+	Variable num = ItemsInList(header)
+	
+	Variable index = -1
+	
+	// Ask index of image to load. If only one image present, use that
+	if (result > 1)
+		String numlist = ""
+		Variable i
+		for (i = 0; i < num; i+=1)
+			// Include in list if header parsed correctly
+			if (cmpstr(StringFromList(i, header), "-") != 0)
+				numlist += num2str(i) + ";"
+			endif
+		endfor
+		
+		String indexstr
+		Prompt indexstr, "Image number to load", popup numlist
+		DoPrompt "Load image", indexstr
+		index = str2num(indexstr)
+	else
+		// Find the first (and only) entry which is not "-"
+		for (i = 0; i < num; i+=1)
+			if (cmpstr(StringFromList(i, header), "-") != 0)
+				index = i
+				print "Using automatically image " + num2str(index) + " in file"
+				break
+			endif
+		endfor
+	endif
+	
+	if (index < 0)
+		print "Error selecting image index"
+		return -1
+	endif
+	
+	result = LoadImageFromFile(filename, index, header)
+	
+	if (result < 0)
+		print "Error loading image"
+		return -1
+	endif
+	
+	ShowImage()
+	
+	String/G imagegraph
+	SetWindow $imagegraph,hook(imageinspect)=inspector
+
+	return 0
+		
+End
+
+
+// Loads external image from a file (e.g. FV, image(s) only)
+// and replaces quasi-height topo of the original FV file.
+//
+// Returns 0 on success, < 0 for error
+Function LoadImageFromFile(filename, index, header)
+	String filename
+	Variable index
+	String header
+	
+	//Offsets(a), lengths(b), bytes(c), scale(d) in header: "a0,b0,c0,d0;a1,b1,c1,d1;..."
+	Variable offset = str2num(StringFromList(0, StringFromList(index,header), ","))
+	Variable length = str2num(StringFromList(1, StringFromList(index,header), ","))
+	Variable bpp = str2num(StringFromList(2, StringFromList(index,header), ","))
+	Variable scale = str2num(StringFromList(3, StringFromList(index,header), ","))
+	
+	if (length/bpp != ksFVRowSize*ksFVRowSize)
+		print filename + ": Size does not match FV data for image " + num2str(index)
+		return -1
+	endif
+	
+	GBLoadWave/Q/B/A=image/T={bpp*8,4}/S=(offset)/W=1/U=(length/bpp) filename
+	
+	if (V_flag < 1)
+		print filename + ": Could not load image " + num2str(index)
+		return -1
+	endif
+
+	String/G imagewave = StringFromList(0,S_waveNames)
+	
+	WAVE w = $imagewave
+	
+	w *= scale
+	
+	redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
+	
+	String n = "filename:" + filename + ";offset:" + num2str(offset) + ";length:" + num2str(length)
+	n += ";bpp:" + num2str(bpp) + ";scaleNmPerLSB:" + num2str(scale) + ";"
+	Note/K $imagewave, n
+	
+	return 0
+End
+
+
+// Kills all waves in the current data folder starting with fc* and rfc*
+//
 // Returns 0 on success
 Function KillPreviousWaves()
 	Variable i = 0
