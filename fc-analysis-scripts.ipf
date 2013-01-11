@@ -47,7 +47,7 @@ Menu "Force Map Analysis"
 	"Load File/1", LoadForceMap()
 	"Choose Force Curves/2", ChooseForceCurves()
 	"Do Analysis/3", Analysis()
-	"Load and Analyse All FCs/4", LoadandAnalyseAll()
+	"Load and Analyse All FCs", LoadandAnalyseAll()
 	"Load Image", LoadImage()
 End
 
