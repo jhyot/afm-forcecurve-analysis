@@ -3,6 +3,8 @@
 #include <SaveGraph>
 #include <Wave Loading>
 
+#include ":plotting-code"
+
 
 // TODO
 // Code style
@@ -20,21 +22,21 @@
 
 // Allowed force map versions, comma separated
 // (add versions once they have been tested)
-static StrConstant ksVersionReq = "0x08100000,0x08150300"
+StrConstant ksVersionReq = "0x07300000,0x08100000,0x08150300"
 
 // Points per FC
 // for now only works with 4096
-static Constant ksFCPoints = 4096
+Constant ksFCPoints = 4096
 
 // Force curves per row.
 // For now designed and tested only for square images with 32*32 = 1024 curves
-static Constant ksFVRowSize = 32
+Constant ksFVRowSize = 32
 
 // FC file type as written in header
-static StrConstant ksFileType = "FVOL"
+StrConstant ksFileType = "FVOL"
 
 // String to be matched (full match, case insensitive) at header end
-static StrConstant ksHeaderEnd = "\\*File list end\r"
+StrConstant ksHeaderEnd = "\\*File list end"
  
 
 //
@@ -1478,117 +1480,14 @@ End
 
 
 
-// Helper functions, can be called from console
-Function plot1(idx)
-	Variable idx
-	
-	String wName = "fc" + num2str(idx)
-	WAVE w = $wName
-	WAVE wx = $(wName + "_x_tsd")
-	WAVE wf = $(wName + "_expfit")
-	
-	Display w vs wx
-	AppendToGraph wf
-	ModifyGraph rgb[0]=(0,15872,65280) 
-	ShowInfo
-End
-
-Function plot2(idx)
-	Variable idx
-	
-	WAVE fc, fc_x_tsd, fc_expfit
-	
-	Display/K=1 fc[][idx] vs fc_x_tsd[][idx]
-	AppendToGraph/W=$S_name fc_expfit[][idx]
-	ModifyGraph rgb[0]=(0,15872,65280) 
-
-	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
-	Label left "\\Z13force (pN)"
-	Label bottom "\\Z13tip-sample distance (nm)"
-	SetAxis left -25,270
-	SetAxis bottom -5,75
-	ModifyGraph zero=8
-	
-	ShowInfo
-End
-
-Function rplot2(idx)
-	Variable idx
-	
-	String rwName = "rfc" + num2str(idx)
-	String wName = "fc" + num2str(idx)
-	WAVE rw = $rwName
-	WAVE rwx = $(rwName + "_x_tsd")
-	WAVE w = $wName
-	WAVE wx = $(wName + "_x_tsd")
-	WAVE wf = $(wName + "_expfit")
-	
-	Display w vs wx
-//	AppendToGraph/W=$S_name wf
-//	ModifyGraph rgb[0]=(0,15872,65280)
-	
-	AppendToGraph/W=$S_name rw vs rwx
-	ModifyGraph rgb[0]=(0,15872,35280)
-	
-
-	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
-	Label left "\\Z13force (pN)"
-	Label bottom "\\Z13tip-sample distance (nm)"
-	SetAxis/A
-	
-	ShowInfo
-End
-
-Function plot4(idx)
-	Variable idx
-	
-	String wname = "fc" + num2str(idx)
-	WAVE w = $wname
-	WAVE xTSD = $(wname + "_x_tsd")
-	WAVE wlog = $(wname + "_log")
-	
-	WAVE ws = $(wname + "_smooth")
-	WAVE xTSDs = $(wname + "_x_tsd_smooth")
-	WAVE wslog = $(wname + "_smooth_log")
-
-	Make/N=2/D/O tmp_noiselevel
-	WAVE tmp_noiselevel
-
-	if (WaveExists($(wname + "_linfit1")))
-		WAVE linfit1 = $(wname + "_linfit1")
-		WAVE linfit2 = $(wname + "_linfit2")
-	endif
-	
-	// Display traces
-	DoWindow/K tmp_reviewgraph
-	
-	Display/N=tmp_reviewgraph w vs xTSD
-	AppendToGraph/L ws vs xTSDs
-	ModifyGraph offset[0]={10,0}, offset[1]={10,0}
-	
-	AppendToGraph/R wlog vs xTSD
-	AppendToGraph/R wslog vs xTSDs
-	
-	tmp_noiselevel = log(str2num(StringByKey("noiseLevel", note(w))))
-	SetScale/I x 0, (xTSDs[numpnts(xTSDs)-1]), "nm", tmp_noiselevel
-	AppendToGraph/R tmp_noiselevel
-	
-	AppendToGraph/R linfit1
-	AppendToGraph/R linfit2
-	
-	SetAxis right -0.5,2.5
-	
-	ModifyGraph rgb[0]=(0,15872,65280), rgb[1]=(0,52224,52224), rgb[2]=(0,39168,0)
-	ModifyGraph rgb[3]=(65280,43520,0), rgb[4]=(0,0,0), rgb[5]=(0,0,0), rgb[6]=(65280,0,0)
-
-	ModifyGraph msize=0.5, mode=3
-	ModifyGraph marker[0]=16, marker[2]=16, marker[1]=0, marker[3]=0
-	ModifyGraph mode[4]=0, mode[5]=0, mode[6]=0
-	ModifyGraph lsize[4]=1, lsize[5]=2, lsize[6]=2
-	
-	ShowInfo
 
 End
+
+
+End
+
+
+
 
 
 // waves: StringList of wave names (";" as separator)
