@@ -1280,7 +1280,7 @@ Function DebugTest()
 	Variable tmpRet
 	String tmpHd
 	
-	tmpRet = ParseFCHeader("C:Users:Janne:Desktop:au-rings-afm:peg57:peg57-pbs-0.spm", tmpHd)
+	//tmpRet = ParseFCHeader("C:Users:Janne:Desktop:au-rings-afm:peg57:peg57-pbs-0.spm", tmpHd)
 	Print "ret:" + num2str(tmpRet)
 	Print tmpHd
 End
