@@ -1128,7 +1128,7 @@ Function AvgWaves(waves, from, to, wavg, wsd)
 	
 	Variable i = 0
 	String wname
-	Make/O/WAVE wlist
+	Make/O/WAVE/FREE wlist
 	
 	do
 		wname = StringFromList(i, waves, ";")
@@ -1150,7 +1150,7 @@ Function AvgWaves(waves, from, to, wavg, wsd)
 	
 	Variable j
 	Variable k = 0
-	Make/N=(wnum) wrow
+	Make/N=(wnum)/FREE wrow
 	
 	for (i=from; i <= to; i+=1)
 		wrow = 0
