@@ -56,7 +56,10 @@ Menu "Force Map Analysis"
 	"Choose Force Curves/2", ChooseForceCurves()
 	"Do Analysis/3", Analysis()
 	"Load and Analyse All FCs", LoadandAnalyseAll()
+	"-"
 	"Load Image", LoadImage()
+	"Show Image", ImageToForeground()
+	"Show Height Map", MapToForeground()
 End
 
 
@@ -1048,9 +1051,15 @@ End
 
 
 
+Function ImageToForeground()
+	String/G imagegraph
+	DoWindow/F $imagegraph
 End
 
 
+Function MapToForeground()
+	String/G resultgraph
+	DoWindow/F $resultgraph
 End
 
 
