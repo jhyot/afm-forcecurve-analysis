@@ -549,17 +549,14 @@ End
 
 
 
-
-
 Function rinspector(s)			//retractfeature
 	STRUCT WMWinHookStruct &s
-	Variable rval= 0
+	Variable rval = 0
 	variable mouseloc,xval,yval, xbla,ybla
 	string/G selectedCurvesW
 
 
-	switch(s.eventCode)
-		case 3:
+	if ((s.eventCode == 3) && (s.eventMod & 1 != 0))
 			yval=s.mouseLoc.v
 			xval=s.mouseLoc.h
 
@@ -586,7 +583,7 @@ Function rinspector(s)			//retractfeature
 
 			endif
 
-	EndSwitch
+	endif
 
 	return rval
 
@@ -596,36 +593,76 @@ End
 
 Function inspector(s)			//heightsmap
 	STRUCT WMWinHookStruct &s
-	Variable rval= 0
-	variable mouseloc,xval,yval, xbla,ybla
+	Variable rval = 0
 	string/G selectedCurvesW
-
-
-	switch(s.eventCode)
-		case 3:
-			yval=s.mouseLoc.v
-			xval=s.mouseLoc.h
-
-
-			ybla=round(axisvalfrompixel("results","left",yval-s.winrect.top))
-			xbla=round(axisvalfrompixel("results","bottom",xval-s.winrect.left))
-
-
-			wave sel=$selectedCurvesW
-			wave brushheights
-
-
-			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && sel[xbla+(ybla*ksFVRowSize)])
-
-				plot2(abs(xbla+(ybla*ksFVRowSize)))
-
-				print "FCNumber:",xbla+(ybla*ksFVRowSize)
-				print "X:",xbla,"Y:",ybla
-				print "Brushheight for selection:",brushheights[xbla+(ybla*ksFVRowSize)],"nm"
+	String/G imagegraph, resultgraph
+	
+	Variable mouseX = s.mouseLoc.h
+	Variable mouseY = s.mouseLoc.v
+	Variable pixelX = round(AxisValFromPixel("", "bottom", mouseX - s.winrect.left))
+	Variable pixelY = round(AxisValFromPixel("", "left", mouseY - s.winrect.top))
+	Variable fcnum = abs(pixelX+(pixelY*ksFVRowSize))
+	
+	WAVE/Z sel = $selectedCurvesW
+	if (!WaveExists(sel))
+		return rval
+	endif
+	
+	// if event is from a graph that does not correspond to the saved graph names, ignore it
+	if ((cmpstr(s.WinName, imagegraph) != 0) && (cmpstr(s.WinName, resultgraph) !=0))
+		return rval
+	endif
+	
+	switch (s.eventCode)
+	
+		// mousemoved
+		case 4:
+			if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1) && sel[fcnum])
+				WAVE brushheights
+				Variable h = round(brushheights[fcnum]*10)/10
+				TextBox/W=$s.WinName/C/F=0/B=3/N=hovertext/A=LB/X=(pixelX/ksFVRowsize*100+10)/Y=(pixelY/ksFVRowsize*100) " " + num2str(h) + " "
 			else
-				print "No Data here!"
+				TextBox/W=$s.WinName/C/N=hovertext ""
 			endif
-	EndSwitch
+			
+			rval = 0
+			break
+			
+		// mousedown
+		case 3:
+			// only on left mouseclick
+			if (s.eventMod & 1 != 0)
+
+				if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1) && sel[fcnum])
+					// Put marker on selected pixel on image and result graphs (check if open)
+					DoWindow $imagegraph
+					if (V_flag == 1)
+						DrawAction/W=$imagegraph delete
+						SetDrawEnv/W=$imagegraph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
+						DrawRect/W=$imagegraph pixelX/ksFVRowSize+0.3/ksFVRowSize, 1-pixelY/ksFVRowSize-0.3/ksFVRowSize,  pixelX/ksFVRowSize+0.7/ksFVRowSize, 1-pixelY/ksFVRowSize-0.7/ksFVRowSize
+					endif
+					
+					DoWindow $resultgraph
+					if (V_flag == 1)
+						DrawAction/W=$resultgraph delete
+						SetDrawEnv/W=$resultgraph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
+						DrawRect/W=$resultgraph pixelX/ksFVRowSize+0.3/ksFVRowSize, 1-pixelY/ksFVRowSize-0.3/ksFVRowSize,  pixelX/ksFVRowSize+0.7/ksFVRowSize, 1-pixelY/ksFVRowSize-0.7/ksFVRowSize
+					endif
+					
+					// Show new graph with curve
+					PlotFC(fcnum)
+	
+					WAVE brushheights
+					WAVE/T fcmeta
+					
+					print "FCNumber: " + num2str(fcnum) + "; X: " + num2str(pixelX) + "; Y: " + num2str(pixelY) + "; Brush height:", brushheights[fcnum], "nm"
+					print fcmeta[fcnum]
+					
+					rval = 1
+				endif
+			endif
+			break
+	endswitch
 
 	return rval
 
