@@ -3,6 +3,7 @@
 #include <SaveGraph>
 #include <Wave Loading>
 
+#include ":analysis-code"
 #include ":plotting-code"
 
 
@@ -37,6 +38,11 @@ StrConstant ksFileType = "FVOL"
 
 // String to be matched (full match, case insensitive) at header end
 StrConstant ksHeaderEnd = "\\*File list end"
+
+// Brush height calculation parameters
+Constant ksBaselineFitLength = .3	// Fraction of points used for baseline fits
+Constant ksBrushCutoff = 3	// height from force in exponential fit (in pN)
+Constant ksBrushOverNoise = 1		// height from point on curve above noise multiplied by this factor
  
 
 //
@@ -68,7 +74,7 @@ Function LoadandAnalyseAll()
 	Variable i
 	String/G headerstuff, selectedCurvesW = "selectedcurves"
 
-	make/O/N=(ksFVRowSize*ksFVRowsize) $selectedCurvesW
+	Make/O/N=(ksFVRowSize*ksFVRowsize) $selectedCurvesW = NaN
 
 
 	Wave sel=$selectedCurvesW
@@ -555,157 +561,6 @@ End
 
 
 
-Function Analysis()
-
-// Analyse all force curves (FC) in a folder
-// Returns 0 on success, -1 on error
-	String path		// Symbolic path name
-	String wavei			
-	
-	Variable totalWaves=ksFVRowSize*ksFVRowSize
-	Variable result=-1
-	
-	Variable i, t0=ticks
-	
-	String/G selectedCurvesW
-	
-	wave brushheights
-	wave retractfeature
-
-	
-	wave sel=$selectedCurvesW
-
-	WAVE/T fcmeta
-	string header
-	Variable num = 0
-	
-	// Create 2d waves for Analysis
-	Make/N=(ksFCPoints, totalWaves)/O fc_blfit=NaN
-	Make/N=(ksFCPoints/8, totalWaves)/O fc_sensfit=NaN
-	Make/N=(ksFCPoints, totalWaves)/O fc_x_tsd=NaN
-	Make/N=(ksFCPoints, totalWaves)/O fc_expfit=NaN
-	
-	for (i=0; i < totalWaves; i+=1)
-	
-		if(sel[i])
-		
-			header = fcmeta[i]
-		
-			variable rampSize=numberbykey("rampSize", header)
-			variable VPerLSB=numberbykey("VPerLSB", header)
-			variable springConst=numberbykey("springConst", header)	
-			
-			// Set Z piezo ramp size (x axis)
-			SetScale/I x 0, (rampSize), "nm", fc
-			SetScale/I x 0, (rampSize), "nm", fc_blfit
-			SetScale/I x 0, (rampSize/8), "nm", fc_sensfit
-			SetScale/I x 0, (rampSize), "nm", fc_expfit
-		
-			result = AnalyseBrushHeight(i, brushheight_names, brushheights)
-			if(result < 0) //could not find start/endpoint of fit or could not fit
-				brushheights[i] = -1 //put some out-of-range number for brushheight (for better visualization in result-graph)
-			endif
-			
-			//retractfeature[i]=retractedforcecurvebaselinefit(i, rampSize, VPerLSB, springConst)	//baselinefit for the retracted curves.
-			retractfeature[i]=1 // until retractedforcecurvebaselinefit is fixed for 2d waves
-		
-			num += 1
-		endif
-		
-	Prog("Analysis",i,totalWaves)
-		
-	endfor
-
-	
-	printf "Elapsed time: %g seconds\r",(ticks-t0)/60
-	
-	if(waveexists(brushheights2))
-		KillWaves brushheights2
-	endif
-	
-	Make/N=(num)/O brushheights2
-	
-	num=0
-	wave brushheights
-	
-	// What does this loop do !?
-	for (i=0; i < totalWaves; i+=1)
-		if(sel[i])	
-			num += 1
-			brushheights2[num-1] = brushheights[i]
-		endif
-	endfor
-
-
-//	if (result==0)
-//	ReviewCurves("brushheight_names", "brushheights")
-//	endif
-	
-	
-	string heights="heightsmap", temp="tempwave"
-	
-	if(waveexists(heights))
-		killwaves $heights
-	endif
-	make/N=(totalWaves)/O $heights
-	wave urstheights=$heights
-	
-	if(waveexists(temp))
-		killwaves $temp
-	endif
-	make/N=(totalWaves)/O $temp
-	wave urst=$temp
-	
-	duplicate/O brushheights urstheights
-	duplicate/O brushheights $temp
-	
-	wavestats urstheights
-	variable maxheight=V_max
-	
-	for (i=0; i < totalWaves; i+=1)
-	
-		if(urst[i]==-1)	
-		urstheights[i]=1e6
-		endif
-		
-	endfor
-	
-	
-	
-	redimension/N=(ksFVRowSize,ksFVRowSize) retractfeature
-	
-	Display/W=(29.25+450.75+400,55.25,450.75+450.75+400,458)
-	AppendImage retractfeature 
-	
-	DoWindow/C retractfeaturesdetection
-	ModifyImage retractfeature explicit=1,eval={0,46592,51712,63488},eval={-1,0,0,0},eval={1,65535,65535,65535}
-	
-	redimension/N=(ksFVRowSize,ksFVRowSize) urstheights
-
-	Display/W=(29.25+450.75,55.25,450.75+450.75,458)
-	AppendImage $heights
-	
-	DoWindow/C results
-	
-	ModifyImage $heights ctab={V_min+1+1e-3,V_max,Gold,0}, minRGB=(46592,51712,63488), maxRGB=(63488,0,0)
-	
-	DoWindow/F results
-	ColorScale/C/N=text0/F=0/A=RC/E image=heightsmap
-	ModifyGraph width=300, height=300
-	
-	DoUpdate
-	SetWindow kwTopWin,hook(inspect)= inspector
-	
-	
-	DoWindow/F retractfeaturesdetection
-	SetWindow kwTopWin,hook(inspect)=rinspector
-	DoUpdate
-
-	return 0
-
-End
-
-
 
 Function rinspector(s)			//retractfeature
 	STRUCT WMWinHookStruct &s
@@ -1035,321 +890,33 @@ Function ReadFCHeaderLines(fileName)
 End
 
 
-
-Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
-	Variable index, rampSize, VPerLSB, springConst
-	
-	Variable totalWaves = ksFVRowSize*ksFVRowSize
-
-	Variable/G V_fitoptions=4 //no fit window
-
-	String wnametemp = "fc" + num2str(index)		
-	WAVE w = $wnametemp
-	String header = note(w)
-
-	String wname= "rfc" + num2str(index)
-	WAVE rw=$wname
-
-	
-	make/N=(totalWaves)/O timer1
-	Variable tic1
-	make/N=(totalWaves)/O timer2
-	Variable tic2
-	make/N=(totalWaves)/O timer3
-	Variable tic3
-	make/N=(totalWaves)/O timer4
-	Variable tic4
 	
 	
-	
-	// Set Z piezo ramp size (x axis)
-	SetScale/I x 0, rampSize, "nm", rw
-	
-	tic1=ticks
-	// Convert y axis to V
-	rw *= VPerLSB
-	
-	timer1[index]=(ticks-tic1)/60
-	
-	tic2=ticks
-	
-	// Fit baseline and subtract from curve
-	CurveFit/NTHR=1/Q line  rw[2600,3600]
-	WAVE W_coef
-	Make/N=(ksFCPoints) $(wname + "_blfit")
-	WAVE blfit = $(wname + "_blfit")
-	SetScale/I x 0, rampSize, "nm", blfit
-	// Save baseline to fc<i>_blfit
-	blfit = W_coef[0] + W_coef[1]*x
-	// Subtr. baseline
-	rw -= (W_coef[0] + W_coef[1]*x)
-	
-	// Sometimes last points of curve are at smallest LSB value
-	// Set those to 0 (i.e. if value < -3 V)
-	rw[3600,] = (rw[p] > -3) * rw[p]
-	
-	timer2[index]=(ticks-tic2)/60
-
-	tic3=ticks
-	// Fit deflection sensitivity and change y scale
-	CurveFit/NTHR=1/Q line  rw[10,100]
-	Make/N=(ksFCPoints/8) $(wname + "_sensfit")	// display only 4096/8 points
-	WAVE sensfit = $(wname + "_sensfit")
-	SetScale/I x 0, (rampSize/8), "nm", sensfit
-	// Save fit to fc<i>_sensfit
-	sensfit = W_coef[0] + W_coef[1]*x
-	Variable deflSens = -1/W_coef[1]
-	// Add fitted sens. to header data
-	header += "deflSensFit:" + num2str(deflSens) + ";"
-	//Note/K w, header
-	// Change y scale on all curves to nm
-	rw *= deflSens
-	blfit *= deflSens
-	sensfit *= deflSens
-	
-	timer3[index]=(ticks-tic3)/60
-	
-	tic4=ticks
-	
-	// Create x values wave for tip-sample-distance
-	Make/N=(ksFCPoints) $(wname + "_x_tsd")
-	WAVE xTSD = $(wname + "_x_tsd")
-	
-	timer4[index]=(ticks-tic4)/60
-	
-	// Write displacement x values
-	xTSD = rampSize/ksFCPoints * p
-	// Subtract deflection to get tip-sample-distance
-	xTSD += rw
 	
 	
 
 	
-	// Change y scale on all curves to pN
-	Variable sc = springConst
-	rw *= sc * 1000
-	blfit *= sc * 1000
-	sensfit *= sc * 1000
-	SetScale d 0,0,"pN", rw, blfit, sensfit
-	
-	// Shift hard wall contact point to 0 in xTSD
-	WaveStats/R=[10,100]/Q xTSD
-	xTSD -= V_avg
 	
 
-	//retractcurve feature detection 
 	
-	Variable detectsetpnt=-30	//Set your lower limit of noise (nm). Values smaller than this value are interpreted as a retract feature.
-	Variable maxpnt=numpnts(rw)-1,minpnt
+	
+
+	
 	
  
 	
-	wavestats/Q/R=[0,maxpnt] rw
 	
-	minpnt = x2pnt(rw,V_minloc)
 	
 	
 
-	if(V_min<detectsetpnt)
 	
 		
-		//print detectsetpnt, V_min, rw[minpnt], rw[minpnt-1], rw[minpnt+1]
 
 		
-		if(rw[minpnt-1]<detectsetpnt && rw[minpnt+1]<detectsetpnt)
 			
-			return 1
-		
-		else
-		
-			do
-		
-				wavestats/Q/R=[0,minpnt-1] rw
-				
-				//print "do",minpnt, V_min, V_minloc
-		
-				minpnt = x2pnt(rw,V_minloc)
 			
-				if(rw[minpnt-1]<detectsetpnt && rw[minpnt+1]<detectsetpnt)
-	
-					return 1
 			
-				endif
-		
-			while(V_minloc>5)	//when no feature below x=5nm then exit with -1
 			
-			return -1
-	
-		endif
-	
-	
-	
-	endif
-	
-	return -1
-	
-End
-
-
-// Analyse brush height, performing all the necessary data processing steps.
-// Works in the current data folder with the wave named fc<i> with <i> being the index parameter.
-// Returns 0 if all is successful, -1 otherwise.
-//
-// NOTE: A lot of parameters/assumptions are hardcoded here for brush extend FC curves with 4096 points
-// (todo: change this in future)
-Function AnalyseBrushHeight(index, wNames, wHeights)
-	Variable index
-	WAVE/T wNames
-	WAVE wHeights
-	
-	Variable V_fitOptions = 4		// suppress progress window
-	
-	WAVE/T fcmeta
-	
-	String header = fcmeta[index]
-	
-	wNames[index][0] = "fc" + num2str(index)
-	wNames[index][1] = StringByKey("fileName", header)
-	
-	WAVE fc
-	WAVE fc_blfit, fc_sensfit, fc_x_tsd, fc_expfit
-	Make/FREE/N=(ksFCPoints) w, blfit, xTSD, expfit
-	Make/FREE/N=(ksFCPoints/8) sensfit
-	
-	// copy data from 2d array to temporary wave. copy back after all analysis
-	w[] = fc[p][index]
-
-	// Set Z piezo ramp size (x axis)
-	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", w
-	
-	String wname = "fc" + num2str(index)
-	
-	// Convert y axis to V
-	w *= NumberByKey("VPerLSB", header)
-	
-	// Fit baseline and subtract from curve
-	CurveFit/NTHR=1/Q line  w[2600,3600]
-	WAVE W_coef
-	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", blfit
-
-	blfit = W_coef[0] + W_coef[1]*x
-	// Subtr. baseline
-	w -= (W_coef[0] + W_coef[1]*x)
-	
-	// Sometimes last points of curve are at smallest LSB value
-	// Set those to 0 (i.e. if value < -3 V)
-	w[3600,] = (w[p] > -3) * w[p]
-	
-	// Fit deflection sensitivity and change y scale
-	CurveFit/NTHR=1/Q line  w[10,100]
-	SetScale/I x 0, (NumberByKey("rampSize", header)/8), "nm", sensfit
-
-	sensfit = W_coef[0] + W_coef[1]*x
-	Variable deflSens = -1/W_coef[1]
-	// Add fitted sens. to header data
-	header += "deflSensFit:" + num2str(deflSens) + ";"
-	fcmeta[index] = header
-	// Change y scale on all curves to nm
-	w *= deflSens
-	blfit *= deflSens
-	sensfit *= deflSens
-	
-	// Create x values wave for tip-sample-distance
-	// Write displacement x values
-	xTSD = NumberByKey("rampSize", header)/ksFCPoints * p
-	// Subtract deflection to get tip-sample-distance
-	xTSD += w
-	
-	// Change y scale on all curves to pN
-	Variable springConst = NumberByKey("springConst", header)
-	w *= springConst * 1000
-	blfit *= springConst * 1000
-	sensfit *= springConst * 1000
-	SetScale d 0,0,"pN", w, blfit, sensfit
-	
-	// Shift hard wall contact point to 0 in xTSD
-	WaveStats/R=[10,100]/Q xTSD
-	xTSD -= V_avg
-	
-	// write back curves to 2d wave
-	fc[][index] = w[p]
-	fc_blfit[][index] = blfit[p]
-	fc_sensfit[][index] = sensfit[p]
-	fc_x_tsd[][index] = xTSD[p]
-	
-	// Find start point for exponential fit:
-	// Sliding box average (31 pts) crosses 1 nm
-	FindLevel/B=31/EDGE=1/P/Q xTSD, 1
-	if (V_flag != 0)
-		Print wname + ": Starting point for exp fit not found"
-		return -1
-	endif
-	Variable expFitStart = floor(V_levelX)
-	// If expFitStart at very low force, add some additional points to fit range,
-	// otherwise Curvefit will have difficulties to fit an exponential
-	if (w[expFitStart] < 25)
-		expFitStart -= 50
-	endif
-	
-	// Write start point to header note
-	header += "expFitStartPt:" + num2str(expFitStart) + ";"
-	fcmeta[index] = header
-	
-	// Find end point for exp fit the same way
-	FindLevel/B=31/EDGE=2/P/Q w, 1
-	if (V_flag != 0)
-		Print wname + ": End point for exp fit not found"
-		return -1
-	endif
-	Variable expFitEnd = floor(V_levelX)
-	// Add some additional points to range end
-	// If calculated end point very near 0, add a bit less to make a better fit
-	if (xTSD[expFitEnd] < 3)
-		expFitEnd += 200
-	else
-		expFitEnd += 500
-	endif
-	// Write end point to header note
-	header += "expFitEndPt:" + num2str(expFitEnd) + ";"
-	fcmeta[index] = header
-	
-	// Fit exponential curve to force-vs-tsd
-	Variable V_fitError = 0		// prevent abort on error
-	CurveFit/NTHR=1/Q exp_XOffset w[expFitStart,expFitEnd]/X=xTSD
-	if (V_fitError)
-		Print wname + ": Error doing CurveFit"
-		return -1
-	endif
-	
-	// Write some values to header note
-	header += "expFitChiSq:" + num2str(V_chisq) + ";"
-	header += "expFitTau:" + num2str(W_coef[2]) + ";"
-	header += "expFitBL:" + num2str(W_coef[0]) + ";"
-	fcmeta[index] = header
-	
-	WAVE W_fitConstants
-	// Set scale to match the tsd x scale
-	SetScale/I x 0, (NumberByKey("rampsize", header)), "nm", expfit
-	SetScale d 0, 0, "pN", expfit
-	expfit = W_coef[0]+W_coef[1]*exp(-(x-W_fitConstants[0])/W_coef[2])
-	
-	// write back curves to 2d wave
-	fc_expfit[][index] = expfit[p]
-	
-	// Point in FC where force is 1 pN higher than expfit baseline
-	// equals brush start (defined arbitrarily)
-	Variable heightP = BinarySearch(expfit, W_coef[0]+1)
-	if (heightP < 0)
-		Print wname + ": Brush start point not found"
-		return -1
-	endif
-	Variable height = pnt2x(expfit, heightP+1)
-	
-	Print wname + ": Brush height = " + num2str(height)
-	wHeights[index] = height
-
-	return 0
-End
 
 
 // Interactive review of force curves and curve fits
