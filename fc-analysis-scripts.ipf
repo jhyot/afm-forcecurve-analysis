@@ -3,15 +3,15 @@
 #include <SaveGraph>
 #include <Wave Loading>
 
-#include ":analysis-code"
-#include ":plotting-code"
+#include ":analysis-code"		// Analysis
+#include ":plotting-code"		// PlotFC
 
 
 // TODO
-// LoadImage() or similar for quasi-height image
-// retraction curve handling (make optional, variable names etc)
+// enhance retraction curve handling
 // Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
 // Make button in heightimage and heightmap for inspect mode (i.e. be able to turn off inspect mode)
+// indicate flagged curves in review
 
 
 // **** USER CONFIGURABLE CONSTANTS ****
@@ -27,7 +27,7 @@ StrConstant ksVersionReq = "0x07300000,0x08100000,0x08150300"
 Constant ksFCPoints = 4096
 
 // Force curves per row.
-// For now designed and tested only for square images with 32*32 = 1024 curves
+// Tested with 32 and 16 pixels per row
 Constant ksFVRowSize = 32
 
 // FC file type as written in header
