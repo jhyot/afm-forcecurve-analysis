@@ -57,7 +57,14 @@ Menu "Force Map Analysis"
 	"Load Image", LoadImage()
 	"Show Image", ImageToForeground()
 	"Show Height Map", MapToForeground()
-	"Review All Curves", ReviewCurvesMenu()
+	"-"
+	Submenu "Review"
+		"Flag curves", FlagCurves()
+		"Mark flagged", MarkFlaggedPixels()
+		"-"
+		"Review Flagged Curves", ReviewCurvesFlagged()
+		"Review All Curves", ReviewCurvesAll()
+	End
 End
 
 
@@ -686,7 +693,6 @@ Function inspector(s)			//heightsmap
 	endswitch
 
 	return rval
-
 End
 
 
