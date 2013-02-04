@@ -209,8 +209,31 @@ Function PlotFC_setzoom(level)
 	endswitch
 End
 
+
+// Print the name of the data folder onto the graph
+// If a graph is in front, use the data folder of the first trace/image
+// Otherwise use current data folder
 Function PutDFNameOnGraph()
-	String df = GetDataFolder(0)
+	String df
+	
+	// Test if graph is an image
+	String imlist = ImageNameList("", ";")
+	if (cmpstr("", imlist) != 0)
+		// is an image
+		WAVE w = ImageNameToWaveRef("", StringFromList(0, imlist))
+		df = GetWavesDataFolder(w, 1)
+	else
+		// not an image
+		WAVE/Z w = WaveRefIndexed("", 0, 3)
+		if (WaveExists(w))
+			df = GetWavesDataFolder(w, 1)
+		else
+			// didn't find image or normal traces, just use current data folder
+			df = GetDataFolder(1)
+		endif
+	endif
+		
+	SplitString/E="(?i)^root:(.*?):?$" df, df
 	TextBox/C/N=dfname/F=0/A=LB/X=.5/Y=.1/E=2 df
 End
 
