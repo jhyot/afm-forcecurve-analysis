@@ -74,7 +74,7 @@ Function Analysis()
 	
 	
 	// brushheights: 1D wave to hold analysed brush heights and NaN if not analysed
-	// heightsmap: 2D (redimension later) with -1 instead of NaN
+	// heightsmap: 2D (redimension later) with -100 instead of NaN
 	WAVE brushheights
 	Make/N=(totalWaves)/O heightsmap = NaN
 	
@@ -97,7 +97,7 @@ Function Analysis()
 			result = AnalyseBrushHeight3(i, brushheight_names, brushheights)
 			if(result < 0)
 				//could not determine brush height
-				heightsmap[i] = -1
+				heightsmap[i] = -100
 			else
 				heightsmap[i] = brushheights[i]
 			endif
