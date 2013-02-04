@@ -22,12 +22,12 @@ End
 
 // Displays new graph with topography image
 Function ShowResultMap()
-	String/G resultwave
+	SVAR resultwave = :internalvars:resultwave
 
 	Display/W=(30+430,55,30+387+430,55+358)
 	AppendImage $resultwave
 	
-	String/G resultgraph=S_name
+	String/G :internalvars:resultgraph=S_name
 	
 	// Scale range between 0 and 99th percentile of heights (ignore extreme outliers)
 	WAVE brushheights
@@ -95,7 +95,7 @@ Function PlotFC(index)
 	SetWindow kwTopWin, userdata=num2str(index)
 	
 	
-	Variable/G plotFCzoom = 1
+	Variable/G :internalvars:plotFCzoom = 1
 	
 	ControlBar/T 30
 	
@@ -112,7 +112,7 @@ End
 Function PlotFC_zoom(cname) : ButtonControl
 	String cname
 	
-	NVAR plotFCzoom
+	NVAR plotFCzoom = :internalvars:plotFCzoom
 	
 	strswitch (cname)
 		case "zoomb":

@@ -2,26 +2,30 @@
 
 
 Function Analysis()
-	String path		// Symbolic path name
-	String wavei			
-	
+
+	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
+
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable result=-1
 	
 	Variable i, t0=ticks
 	
-	String/G selectedCurvesW
+	SVAR selectionwave = :internalvars:selectionwave
 	
 	WAVE retractfeature
 
-	WAVE sel=$selectedCurvesW
+	WAVE sel=$selectionwave
 
 	WAVE/T fcmeta
 	String header
 	Variable num = 0
 	
 	// Save analysis parameters, or compare if already saved
-	SVAR/Z params = analysisparameters
+	SVAR/Z params = :internalvars:analysisparameters
 	Variable conflict = 0
 	if (SVAR_Exists(params))
 		if (ksFCPoints != NumberByKey("ksFCPoints", params))
@@ -36,8 +40,8 @@ Function Analysis()
 			conflict = 1
 		endif
 	else
-		String/G analysisparameters = ""
-		SVAR params = analysisparameters
+		String/G :internalvars:analysisparameters = ""
+		SVAR params = :internalvars:analysisparameters
 	endif
 	
 	if (conflict)
@@ -118,11 +122,12 @@ Function Analysis()
 	
 	Redimension/N=(ksFVRowSize,ksFVRowSize) heightsmap
 	
-	String/G resultwave = "heightsmap"
+	String/G :internalvars:resultwave = "heightsmap"
 	
 	ShowResultMap()
 	
-	String/G imagegraph, resultgraph
+	SVAR resultgraph = :internalvars:resultgraph
+	SVAR imagegraph = :internalvars:imagegraph
 		
 	SetWindow $resultgraph,hook(resultinspect)=inspector
 	SetWindow $imagegraph,hook(imageinspect)=inspector
