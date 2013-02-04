@@ -404,3 +404,29 @@ Function plot4(idx)
 	ShowInfo
 
 End
+
+Function DrawPointMarker(graph, xpos, ypos, del)
+	String graph					// graph name where to draw marker
+	Variable xpos, ypos			// x and y positions (in image pixels) for marker
+	Variable del					// delete old markers before drawing new one (0=no, 1=yes)
+	Variable marker
+	
+	DoWindow $graph
+	if (V_flag == 0)
+		// graph does not exist
+		return -1
+	endif
+	
+	SetDrawLayer/W=$graph ProgFront
+	String lastLayer = S_name
+	
+	if (del == 1)
+		// delete previous markers (and other drawings)
+		DrawAction/W=$graph delete
+	endif
+	
+	SetDrawEnv/W=$graph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
+	DrawRect/W=$graph (xpos+0.3)/ksFVRowSize, 1-(ypos+0.3)/ksFVRowSize,  (xpos+0.7)/ksFVRowSize, 1-(ypos+0.7)/ksFVRowSize
+	
+	SetDrawLayer/W=$graph $lastLayer
+End

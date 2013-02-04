@@ -483,14 +483,12 @@ Function chooser(s)
 		Variable mouseX = s.mouseLoc.h
 
 		// Get image pixel and force curve number
-		Variable pixelY = round(axisvalfrompixel(imagegraph, "left", mouseY-s.winrect.top))
-		Variable pixelX = round(axisvalfrompixel(imagegraph, "bottom", mouseX-s.winrect.left))
+		Variable pixelY = round(AxisValFromPixel(imagegraph, "left", mouseY-s.winrect.top))
+		Variable pixelX = round(AxisValFromPixel(imagegraph, "bottom", mouseX-s.winrect.left))
 		Variable fcnum = pixelX+(pixelY*ksFVRowSize)
 
 		if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1))
-			// Draw marker on top of pixel
-			SetDrawEnv xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
-			DrawRect pixelX/ksFVRowSize+0.3/ksFVRowSize, 1-pixelY/ksFVRowSize-0.3/ksFVRowSize,  pixelX/ksFVRowSize+0.7/ksFVRowSize, 1-pixelY/ksFVRowSize-0.7/ksFVRowSize
+			DrawPointMarker(imagegraph, pixelX, pixelY, 0)
 			
 			// Write selected fc offset to selection wave
 			Variable offs = NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*fcnum*2
@@ -668,20 +666,9 @@ Function inspector(s)			//heightsmap
 			if (s.eventMod & 1 != 0)
 
 				if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1) && sel[fcnum])
-					// Put marker on selected pixel on image and result graphs (check if open)
-					DoWindow $imagegraph
-					if (V_flag == 1)
-						DrawAction/W=$imagegraph delete
-						SetDrawEnv/W=$imagegraph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
-						DrawRect/W=$imagegraph pixelX/ksFVRowSize+0.3/ksFVRowSize, 1-pixelY/ksFVRowSize-0.3/ksFVRowSize,  pixelX/ksFVRowSize+0.7/ksFVRowSize, 1-pixelY/ksFVRowSize-0.7/ksFVRowSize
-					endif
-					
-					DoWindow $resultgraph
-					if (V_flag == 1)
-						DrawAction/W=$resultgraph delete
-						SetDrawEnv/W=$resultgraph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
-						DrawRect/W=$resultgraph pixelX/ksFVRowSize+0.3/ksFVRowSize, 1-pixelY/ksFVRowSize-0.3/ksFVRowSize,  pixelX/ksFVRowSize+0.7/ksFVRowSize, 1-pixelY/ksFVRowSize-0.7/ksFVRowSize
-					endif
+					// Put marker on selected pixel on image and result graphs
+					DrawPointMarker(imagegraph, pixelX, pixelY, 1)
+					DrawPointMarker(resultgraph, pixelX, pixelY, 1)
 					
 					// Show new graph with curve
 					PlotFC(fcnum)
