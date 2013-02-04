@@ -431,27 +431,43 @@ Function ChooseFVs()
 	NewPanel/N=Dialog/W=(225,105,525,305) as "Dialog"
 	AutoPositionWindow/M=0/R=$imagegraph
 	Button done,pos={119,150},size={50,20},title="Done"
-	Button done,proc=DialogDoneButtonProc
+	Button done,proc=ChooseFVs_button
 	Button sall, pos={119,100},size={50,20},title="All"
-	Button sall,proc=selectall
+	Button sall,proc=ChooseFVs_button
 	
 	DoWindow/F $imagegraph
+	SetWindow kwTopWin,hook(imageinspect)= $""
 	SetWindow kwTopWin,hook(choose)= chooser
 End
 
 
-Function selectall(sall) : ButtonControl
-	String sall
-	variable i
-	String/G headerstuff, selectedCurvesW
+Function ChooseFVs_button(ctrl) : ButtonControl
+	String ctrl
+	
+	strswitch (ctrl)
+		case "done":
+			SVAR totalpath = :internalvars:totalpath
+			SVAR imagegraph = :internalvars:imagegraph
+			// turn off the chooser hook
+			SetWindow $imagegraph,hook(choose)= $""
+			// kill the window AFTER this routine returns
+			ReadAllFCs(totalpath)
+			DoWindow/K Dialog
+			break
+		
+		case "sall":
+			String/G headerstuff
+			SVAR selectionwave = :internalvars:selectionwave
+			WAVE sel=$selectionwave
+			Variable i
+			for(i=0;i<(ksFVRowsize*ksFVRowSize);i+=1)
+				sel[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
+			endfor	
+			break
+	endswitch
 
-	wave sel=$selectedCurvesW
-
-	for(i=0;i<(ksFVRowsize*ksFVRowSize);i+=1)
-		sel[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
-	endfor
+	return 0
 End
-
 
 
 Function chooser(s)
@@ -489,26 +505,6 @@ Function chooser(s)
 
 	return rval
 
-End
-
-
-
-
-Function DialogDoneButtonProc(ba) : ButtonControl
-	STRUCT WMButtonAction &ba
-	
-	string/G imagegraph, totalpath
-
-	switch( ba.eventCode )
-		case 2:									// mouse up
-			// turn off the chooser hook
-			SetWindow $imagegraph,hook(choose)= $""
-			// kill the window AFTER this routine returns
-			Execute/P/Q/Z "DoWindow/K "+ba.win
-			ReadAllFCs(totalpath)
-	endswitch
-
-	return 0
 End
 
 
