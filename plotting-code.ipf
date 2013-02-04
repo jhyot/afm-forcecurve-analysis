@@ -2,21 +2,28 @@
 
 
 // Displays new graph with topography image
+// and saves reference to it in internal var
 Function ShowImage()
-	String/G imagewave
+	SVAR imagewave = :internalvars:imagewave
+	String/G :internalvars:imagegraph = RecreateImage(imagewave)	
+	return 0
+End
+
+// Displays new graph with image in parameter
+Function/S RecreateImage(img)
+	String img	// name of image wave to be displayed
+	
 	Display/W=(30,55,30+387,55+358)
-	AppendImage $imagewave
-
-	String/G imagegraph=S_name
-
-	ModifyImage $imagewave ctab={*,*,Gold,0}
-	ModifyGraph width=300,height=300
+	AppendImage $img
+	ModifyImage $img ctab={*,*,Gold,0}
+	ModifyGraph width=300,height=300,margin(right)=90
+	ColorScale/C/N=scale/F=0/A=RC/X=-28 image=$img, "topography (nm)"
 	
 	PutDFNameOnGraph()
 
 	DoUpdate
 	
-	return 0
+	return S_name	
 End
 
 
