@@ -1123,10 +1123,150 @@ Function ReadFCHeaderLines(filename, headerwave)
 End
 
 
-Function ReviewCurvesMenu()
-	Variable/G isMapLoaded
+Function FlagCurves()
 	
-	if (isMapLoaded != 1)
+	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
+	
+	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	// Create wave for flagged pixels; 0 or NaN = not flagged; 1 = flagged
+	Make/O/N=(totalcurves) flaggedcurves=0
+	
+	// Ask for flagging criteria (to be implemented)
+	Variable deflsenspct = 5
+	Variable negbheight = 1
+	Variable bheightoutlier = 3
+	Prompt deflsenspct, "Difference between calculated and saved deflection sensitivity (in %) [0 = off]"
+	Prompt negbheight, "Negative brush height [1 = on, 0 = off]"
+	Prompt bheightoutlier, "Outliers in brush height (in standard deviations) [0 = off]"
+	DoPrompt "Flag curves", deflsenspct, negbheight, bheightoutlier
+	
+	if (V_flag == 1)
+		// Cancel clicked
+		return -1
+	endif
+	
+	Variable flagged_deflsenspct = 0
+	Variable flagged_negbheight = 0
+	Variable flagged_bheightoutlier = 0
+	if (deflsenspct > 0)
+		flagged_deflsenspct = FlagCurves_deflsenspct("flaggedcurves", deflsenspct)
+	endif
+	if (negbheight == 1)
+		flagged_negbheight = FlagCurves_negbheight("flaggedcurves")
+	endif
+	if (bheightoutlier > 0)
+		flagged_bheightoutlier = FlagCurves_bheightoutlier("flaggedcurves", bheightoutlier)
+	endif
+	
+	Print "Flagged:"
+	Print "Deflection sensitivity diff (" + num2str(deflsenspct) + "%): " + num2str(flagged_deflsenspct)
+	Print "Negative brush height (" + num2str(negbheight) + "): " + num2str(flagged_negbheight)
+	Print "Brush height outliers (" + num2str(bheightoutlier) + " SD): " + num2str(flagged_bheightoutlier)
+End
+
+
+// Flag curves where the calculated deflection sensitivity differs
+// from the one in metadata by more than 'pct' percent.
+// Returns: number of flagged waves.
+Function FlagCurves_deflsenspct(flagged, pct)
+	String flagged	// Wave name to put flagged pixels into (must exist)
+	Variable pct		// Percentage difference above which the curves are flagged
+	
+	WAVE flaggedW = $flagged
+	
+	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	
+	SVAR selectionwave = :internalvars:selectionwave
+	WAVE sel = $selectionwave
+	WAVE/T fcmeta
+	
+	Variable deflmeta, deflcalc, pctdiff
+	
+	Variable i
+	Variable numflagged = 0
+	for (i=0; i < totalcurves; i+=1)
+		if (sel[i])
+			deflmeta = NumberByKey("deflSens", fcmeta[i])
+			deflcalc = NumberByKey("deflSensFit", fcmeta[i])
+			pctdiff = 100*abs(1-(deflmeta / deflcalc))
+			if (pctdiff > pct)
+				flaggedW[i] = 1
+				numflagged += 1
+			endif
+		endif
+	endfor
+	
+	return numflagged
+End
+
+// Flag curves with negative brush heights
+// Returns: number of flagged waves.
+Function FlagCurves_negbheight(flagged)
+	String flagged	// Wave name to put flagged pixels into (must exist)
+	
+	WAVE flaggedW = $flagged
+	
+	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	
+	SVAR selectionwave = :internalvars:selectionwave
+	WAVE sel = $selectionwave
+	WAVE brushheights
+	
+	Variable i
+	Variable numflagged = 0
+	for (i=0; i < totalcurves; i+=1)
+		if (sel[i])
+			if (brushheights[i] < 0)
+				flaggedW[i] = 1
+				numflagged += 1
+			endif
+		endif
+	endfor
+	
+	return numflagged
+End
+
+// Flag curves with brush heights which differ from the mean
+// by the specified amount or more (given in standard deviations)
+// Returns: number of flagged waves.
+Function FlagCurves_bheightoutlier(flagged, sd)
+	String flagged	// Wave name to put flagged pixels into (must exist)
+	Variable sd			// Factor of SD above which curves are flagged
+	
+	WAVE flaggedW = $flagged
+	
+	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	
+	SVAR selectionwave = :internalvars:selectionwave
+	WAVE sel = $selectionwave
+	WAVE brushheights
+	
+	WaveStats/Q brushheights
+	
+	Variable i
+	Variable numflagged = 0
+	for (i=0; i < totalcurves; i+=1)
+		if (sel[i])
+			Variable diff = abs(brushheights[i] - V_avg)
+			if (diff > sd*V_sdev)
+				flaggedW[i] = 1
+				numflagged += 1
+			endif
+		endif
+	endfor
+	
+	return numflagged
+End
+
+
+Function ReviewCurvesAll()
+	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	
+	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -1137,7 +1277,92 @@ Function ReviewCurvesMenu()
 	Make/N=(totalWaves)/O heights_acc = NaN
 	Make/N=(totalWaves)/O heights_rej = NaN
 	
-	ReviewCurves("brushheights", "heights_acc", "heights_rej")
+	// Construct filter wave (all previously selected pixels)
+	SVAR selectionwave = :internalvars:selectionwave
+	WAVE sel = $selectionwave
+	Make/N=(totalwaves)/FREE filter = 0
+	
+	Variable i
+	for (i=0; i < totalwaves; i+=1)
+		if (sel[i])
+			filter[i] = 1
+		endif
+	endfor
+	
+	ReviewCurves("brushheights", "heights_acc", "heights_rej", filter)
+End
+
+
+Function ReviewCurvesFlagged()
+	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	
+	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
+	
+	Variable totalwaves = ksFVRowSize * ksFVRowSize
+	
+	// Create accept and reject waves
+	Make/N=(totalWaves)/O heights_acc = NaN
+	Make/N=(totalWaves)/O heights_rej = NaN
+	
+	// Construct filter wave (selected pixels AND flagged pixels) [logical AND]
+	SVAR selectionwave = :internalvars:selectionwave
+	WAVE sel = $selectionwave
+	WAVE fl = flaggedcurves
+	WAVE heights = brushheights
+	Make/N=(totalwaves)/FREE filter = 0
+	
+	Variable i
+	Variable autoacc = 0
+	for (i=0; i < totalwaves; i+=1)
+		if (sel[i])
+			// if flagged, put into review filter; otherwise automatically accept
+			if (fl[i] == 1)
+				filter[i] = 1
+			else
+				heights_acc[i] = heights[i]
+				autoacc += 1
+			endif
+		endif
+	endfor
+	
+	ReviewCurves("brushheights", "heights_acc", "heights_rej", filter)
+	
+	Print "(" + num2str(autoacc) + " curves automatically accepted)"
+	
+End
+
+
+Function MarkFlaggedPixels()
+	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	
+	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
+	
+	Variable totalwaves = ksFVRowSize * ksFVRowSize
+	SVAR imagegraph = :internalvars:imagegraph
+	SVAR resultgraph = :internalvars:resultgraph
+	WAVE fl = flaggedcurves
+	Variable i
+	Variable first = 1
+	for (i=0; i < totalwaves; i+=1)
+		if (fl[i] == 1)
+			Variable pixelX = mod(i,ksFVRowSize)
+			Variable pixelY = floor(i/ksFVRowSize)
+			if (first)
+				DrawPointMarker(imagegraph, pixelX, pixelY, 1)
+				DrawPointMarker(resultgraph, pixelX, pixelY, 1)
+				first = 0
+			else
+				DrawPointMarker(imagegraph, pixelX, pixelY, 0)
+				DrawPointMarker(resultgraph, pixelX, pixelY, 0)
+			endif
+		endif
+	endfor
 End
 
 
@@ -1149,12 +1374,14 @@ End
 // Input and output waves must exist.
 // Output waves will not be deleted, but a value is overwritten once a curve at that position
 // has been accepted or rejected.
-Function ReviewCurves(inputWname, accWname, rejWname)
-	String inputWname	// input wave of brush heights
-	String accWname		// output wave of accepted brush heights
-	String rejWname		// output wave of rejected brush heights
-	
-	String/G selectedCurvesW
+//
+// Filter wave defines which curves are being reviewed.
+Function ReviewCurves(inputWname, accWname, rejWname, filter)
+	String inputWname	// Input wave name of brush heights
+	String accWname		// Output wave name of accepted brush heights
+	String rejWname		// Output wave name of rejected brush heights
+	WAVE filter			// Filter wave. Value 1 at index i means that this curve is reviewed,
+							// otherwise not. Must be of same length as the input/output waves.
 	
 	WAVE inputw = $inputWname
 	WAVE accw = $accWname
@@ -1165,17 +1392,17 @@ Function ReviewCurves(inputWname, accWname, rejWname)
 	WAVE fc_expfit
 	WAVE/T fcmeta
 	
-	WAVE sel = $selectedCurvesW
+	SVAR imagegraph = :internalvars:imagegraph
+	SVAR resultgraph = :internalvars:resultgraph
 
-	Variable totalall = numpnts(inputw)
-	Variable totalsel = 0
-		
+	WaveStats/Q inputw
+	Variable totalcurves = V_npnts
+	Variable filtercurves = 0
+	Variable wavesize = numpnts(inputw)
 	Variable i
-	
-	// count how many points were selected
-	for (i=0; i < totalall; i+=1)
-		if (sel[i])
-			totalsel += 1
+	for (i=0; i < wavesize; i+=1)
+		if (filter[i]==1)
+			filtercurves += 1
 		endif
 	endfor
 	
@@ -1188,9 +1415,12 @@ Function ReviewCurves(inputWname, accWname, rejWname)
 	// default zoom level 1 (0: autoscale; 1,2 increasing zoom)
 	Variable/G :tmp_reviewDF:defzoom = 1
 	
-	for (i=0; i < totalall; i+=1)
-		if (sel[i])
+	for (i=0; i < wavesize; i+=1)
+		if (filter[i] == 1)
 			curvesdone += 1
+			
+			Variable pixelX = mod(i,ksFVRowSize)
+			Variable pixelY = floor(i/ksFVRowSize)
 			
 			header = fcmeta[i]
 
@@ -1212,13 +1442,11 @@ Function ReviewCurves(inputWname, accWname, rejWname)
 			AutoPositionWindow/E/M=0/R=tmp_reviewgraph
 			
 			shortHeader = "FCNum: " + num2str(i)
-			shortHeader += "; X: " + num2str(mod(i,ksFVRowSize)) + "; Y: " + num2str(floor(i/ksFVRowSize)) + "\r"
-			shortHeader += "FitStart: " + StringByKey("expFitStartPt", header) + "\r"
-			shortHeader += "FitEnd: " + StringByKey("expFitEndPt", header) + "\r"
-			shortHeader += "FitTau: " + StringByKey("expFitTau", header) + "\r"
-			shortHeader += "FitBL: " + StringByKey("expFitBL", header) + "\r"
-			shortHeader += "BrushHeight: " + num2str(inputw[i])
-			DrawText 20, 100, shortHeader
+			shortHeader += "; X: " + num2str(pixelX) + "; Y: " + num2str(pixelY) + "\r"
+			shortHeader += "BrushHeight: " + num2str(inputw[i]) + "\r"
+			shortHeader += "DeflSens: " + num2str(NumberByKey("deflSens", header)) + " (saved)  "
+			shortHeader += num2str(NumberByKey("deflSensFit", header)) + " (fit)"
+			DrawText 20, 70, shortHeader
 			
 			Button accb,pos={30,120},size={100,40},title="Accept"
 			Button accb,proc=ReviewCurves_Button			
@@ -1239,8 +1467,11 @@ Function ReviewCurves(inputWname, accWname, rejWname)
 				Button redob,disable=2
 			endif
 			
-			numtext = num2str(curvesdone) + "/" + num2str(totalsel)
+			numtext = num2str(curvesdone) + "/" + num2str(filtercurves)
 			DrawText 200, 260, numtext
+			
+			DrawPointMarker(imagegraph, pixelX, pixelY, 1)
+			DrawPointMarker(resultgraph, pixelX, pixelY, 1)
 			
 			// Wait for user interaction (ends when dialog window is killed)
 			PauseForUser tmp_reviewDialog, tmp_reviewgraph
@@ -1264,7 +1495,7 @@ Function ReviewCurves(inputWname, accWname, rejWname)
 					// redo last
 					Variable j
 					for (j=i-1; j>=0; j-=1)
-						if (sel[j])
+						if (filter[j] == 1)
 							i = j-1
 							curvesdone -= 2
 							break
@@ -1285,8 +1516,8 @@ Function ReviewCurves(inputWname, accWname, rejWname)
 	Variable acc = V_npnts
 	WaveStats/Q rejw
 	Variable rej = V_npnts
-	Print "Reviewed " + num2str(totalsel) + " selected out of " + num2str(totalall) + " total curves"
-	Print "Accepted " + num2str(acc) + "/" + num2str(totalsel) + "; rejected " + num2str(rej) + "/" + num2str(totalsel)	
+	Print "Reviewed " + num2str(curvesdone) + " out of " + num2str(totalcurves) + " total curves"
+	Print "Accepted " + num2str(acc) + ", rejected " + num2str(rej)	
 End
 
 Function ReviewCurves_Button(ctrlName)
