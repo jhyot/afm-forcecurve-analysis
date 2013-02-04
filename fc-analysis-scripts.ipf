@@ -238,9 +238,9 @@ End
 //
 // Returns 0 on success, < 0 for error
 Function LoadImageFromFile(filename, index, header)
-	String filename
-	Variable index
-	String header
+	String filename		// full path of file to read
+	Variable index		// 0-based number of image in file to load
+	String header		// header with data for all images, format see below
 	
 	//Offsets(a), lengths(b), bytes(c), scale(d) in header: "a0,b0,c0,d0;a1,b1,c1,d1;..."
 	Variable offset = str2num(StringFromList(0, StringFromList(index,header), ","))
