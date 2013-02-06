@@ -633,15 +633,9 @@ Function inspector(s)			//heightsmap
 	SVAR/Z resultgraph = :internalvars:resultgraph
 	SVAR/Z imagegraph = :internalvars:imagegraph
 	
-	if (!SVAR_Exists(selectionwave))
+	if (!(SVAR_Exists(selectionwave) && SVAR_Exists(resultgraph) && SVAR_Exists(imagegraph)))
 		return rval
 	endif
-	
-	Variable mouseX = s.mouseLoc.h
-	Variable mouseY = s.mouseLoc.v
-	Variable pixelX = round(AxisValFromPixel("", "bottom", mouseX - s.winrect.left))
-	Variable pixelY = round(AxisValFromPixel("", "left", mouseY - s.winrect.top))
-	Variable fcnum = abs(pixelX+(pixelY*ksFVRowSize))
 	
 	WAVE/Z sel = $selectionwave
 	if (!WaveExists(sel))
@@ -652,6 +646,12 @@ Function inspector(s)			//heightsmap
 	if ((cmpstr(s.WinName, imagegraph) != 0) && (cmpstr(s.WinName, resultgraph) !=0))
 		return rval
 	endif
+	
+	Variable mouseX = s.mouseLoc.h
+	Variable mouseY = s.mouseLoc.v
+	Variable pixelX = round(AxisValFromPixel("", "bottom", mouseX - s.winrect.left))
+	Variable pixelY = round(AxisValFromPixel("", "left", mouseY - s.winrect.top))
+	Variable fcnum = abs(pixelX+(pixelY*ksFVRowSize))
 	
 	switch (s.eventCode)
 	
