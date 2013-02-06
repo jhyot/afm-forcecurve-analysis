@@ -223,7 +223,7 @@ Function PutDFNameOnGraph()
 		WAVE w = ImageNameToWaveRef("", StringFromList(0, imlist))
 		df = GetWavesDataFolder(w, 1)
 	else
-		// not an image
+		// not an image, i.e. might be normal traces
 		WAVE/Z w = WaveRefIndexed("", 0, 3)
 		if (WaveExists(w))
 			df = GetWavesDataFolder(w, 1)
@@ -232,9 +232,24 @@ Function PutDFNameOnGraph()
 			df = GetDataFolder(1)
 		endif
 	endif
-		
+	
+	df = TidyDFName(df)
+	TextBox/C/N=dfname/F=0/A=LB/X=.5/Y=.1/E=2 "\\Zr075" + df
+End
+
+
+// "Tidies up" data folder name for displaying/printing.
+// E.g. the string you get from GetDataFolder(1)
+// Removes 'root:' in front, removes all single quotes
+// Returns tidied up name
+Function/S TidyDFName(df)
+	String df
+	
+	df = ReplaceString("'", df, "")
 	SplitString/E="(?i)^root:(.*?):?$" df, df
-	TextBox/C/N=dfname/F=0/A=LB/X=.5/Y=.1/E=2 df
+	
+	return df
+End
 End
 
 
