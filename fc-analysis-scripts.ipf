@@ -152,6 +152,7 @@ Function LoadForceMap()
 		return -1
 	endif
 	
+	print "Loaded file '" + totalpath + "' into " + TidyDFName(GetDataFolder(1))	
 	isMapLoaded = 1
 	return 0
 	

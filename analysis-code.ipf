@@ -124,6 +124,7 @@ Function Analysis()
 
 	printf "Elapsed time: %g seconds\r", round(10*(ticks-t0)/60)/10
 	
+	print TidyDFName(GetDataFolder(1))
 	print "brushheights:"
 	WaveStats brushheights
 	
