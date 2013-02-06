@@ -561,7 +561,7 @@ Function AnalyseBrushHeight3(index, wNames, wHeights)
 	Duplicate/O w2, w3
 	Smooth/M=0 501, w3
 	WaveStats/Q w3
-	EdgeStats/Q/A=30/P/R=[V_minRowLoc, lastGoodPt]/F=0.05 w3
+	EdgeStats/Q/A=30/P/R=[V_minRowLoc, blFitStart]/F=0.01 w3
 	
 	Variable hardwallPt = round(V_EdgeLoc1)
 	header += "hardwallPt:" + num2str(hardwallPt) + ";"
