@@ -363,7 +363,9 @@ Function AnalyseBrushHeight2(index, wNames, wHeights)
 	// Subtr. baseline
 	w -= (W_coef[0] + W_coef[1]*x)
 	// remove not real data (smallest LSB)
-	w[lastGoodPt,] = 0
+	if ((lastGoodPt+1) < ksFCPoints)
+		w[lastGoodPt+1,] = 0
+	endif
 	
 	// Fit deflection sensitivity and change y scale
 	Make/FREE/N=(ksFCPoints) w1, w2, w3
@@ -547,7 +549,9 @@ Function AnalyseBrushHeight3(index, wNames, wHeights)
 	// Subtr. baseline
 	w -= (W_coef[0] + W_coef[1]*x)
 	// remove not real data (smallest LSB)
-	w[lastGoodPt,] = 0
+	if ((lastGoodPt+1) < ksFCPoints)
+		w[lastGoodPt+1,] = 0
+	endif
 	
 	// Fit deflection sensitivity and change y scale
 	Make/FREE/N=(ksFCPoints) w1, w2, w3
