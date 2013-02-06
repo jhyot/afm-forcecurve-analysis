@@ -1591,7 +1591,26 @@ Function MapToForeground()
 End
 
 
+Function PrintInfo()
+	SVAR ig = :internalvars:imagegraph
+	SVAR iw = :internalvars:imagewave
+	SVAR rg = :internalvars:resultgraph
+	SVAR rw = :internalvars:resultwave
+	SVAR sel = :internalvars:selectionwave
+	SVAR path = :internalvars:totalpath
+	printf "IMAGE graph: %s,  wave: %s\r", ig, iw
+	printf "BRUSHHEIGHTS graph: %s,  wave: %s\r", rg, rw
+	printf "selectionwave: %s,  totalpath: %s\r", sel, path
+End
 
+Function PrintInfoDF(df)
+	String df		// data folder (without 'root:' part) to print info from
+	String fullDF = "root:" + df
+	String prevDF = GetDataFolder(1)
+	SetDataFolder fulldf
+	PrintInfo()
+	SetDataFolder prevDF
+End
 
 
 // waves: StringList of wave names (";" as separator)
