@@ -171,7 +171,7 @@ Function plot_color_auto(textpos)
 End
 
 
-// Lists are in format: "new combined wave; old wave1; old wave2;..."
+// Lists are in format: "new_combined_wave;old_wave1;old_wave2;..."
 Function absrelheights_combine(imglist, bheightlist, absheightlist, nobrushrel, nobrushabs)
 	String imglist, bheightlist, absheightlist, nobrushrel, nobrushabs
 	

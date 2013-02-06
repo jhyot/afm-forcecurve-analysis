@@ -87,9 +87,7 @@ Function Analysis()
 		
 			header = fcmeta[i]
 		
-			Variable rampSize=numberbykey("rampSize", header)
-			Variable VPerLSB=numberbykey("VPerLSB", header)
-			Variable springConst=numberbykey("springConst", header)	
+			Variable rampSize = NumberByKey("rampSize", header)
 			
 			// Set Z piezo ramp size (x axis)
 			SetScale/I x 0, (rampSize), "nm", fc
@@ -539,9 +537,10 @@ Function AnalyseBrushHeight3(index, wNames, wHeights)
 		return -1
 	endif
 	
-	header += "blFitStart:" + num2str(currentPt) + ";"
+	Variable blFitStart = currentPt
+	header += "blFitStart:" + num2str(blFitStart) + ";"
 	
-	CurveFit/NTHR=1/Q line w[currentPt, currentPt + round(ksBaselineFitLength * lastGoodPt)]
+	CurveFit/NTHR=1/Q line w[blFitStart, blFitStart + round(ksBaselineFitLength * lastGoodPt)]
 	WAVE W_coef
 	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", blfit
 
