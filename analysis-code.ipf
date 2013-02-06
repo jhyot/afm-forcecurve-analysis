@@ -75,8 +75,11 @@ Function Analysis()
 	
 	// brushheights: 1D wave to hold analysed brush heights and NaN if not analysed
 	// heightsmap: 2D (redimension later) with -100 instead of NaN
+	// deflsensfitted: 1D wave to hold fitted deflection sensitivities
 	WAVE brushheights
 	Make/N=(totalWaves)/O heightsmap = NaN
+	Make/N=(totalWaves)/O deflsensfitted = NaN
+	
 	
 	for (i=0; i < totalWaves; i+=1)
 	
@@ -101,6 +104,10 @@ Function Analysis()
 			else
 				heightsmap[i] = brushheights[i]
 			endif
+			
+			// Re-read metadata; has been changed/expanded by analysis code above
+			header = fcmeta[i]
+			deflsensfitted[i] = NumberByKey("deflSensFit", header)
 			
 			// Process retract curve
 			RetractTSD(i)
