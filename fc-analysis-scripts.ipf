@@ -1433,10 +1433,10 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 	// (0: autoscale; higher numbers increasing zoom; see PlotFC_setzoom)
 	Variable/G :tmp_reviewDF:defzoom = 1
 	
+	Variable userabort = 0
+	
 	for (i=0; i < wavesize; i+=1)
-		if (filter[i] == 1)
-			curvesdone += 1
-			
+		if (filter[i] == 1)			
 			Variable pixelX = mod(i,ksFVRowSize)
 			Variable pixelY = floor(i/ksFVRowSize)
 			
@@ -1480,12 +1480,15 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 						
 			Button redob,pos={30,220},size={100,40},title="Redo last"
 			Button redob,proc=ReviewCurves_Button
+			
+			Button stopb,pos={200,270},size={40,20},title="Stop"
+			Button stopb,proc=ReviewCurves_Button
 
-			if (curvesdone <= 1)
+			if (curvesdone < 1)
 				Button redob,disable=2
 			endif
 			
-			numtext = num2str(curvesdone) + "/" + num2str(filtercurves)
+			numtext = num2str(curvesdone+1) + "/" + num2str(filtercurves)
 			DrawText 200, 260, numtext
 			
 			DrawPointMarker(imagegraph, pixelX, pixelY, 1)
@@ -1520,10 +1523,22 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 						endif
 					endfor
 					break
+				case 4:
+					// stop
+					print "Review aborted by user, curve " + num2str(i) + " not reviewed"
+					userabort = 1
+					break
 				default:
 					print "User interaction error (neither accepted nor rejected curve " + num2str(i) + ")"
+					userabort = 1
 					break
 			endswitch
+			
+			if (userabort)
+				break
+			endif
+			
+			curvesdone += 1
 		endif
 	endfor
 	
@@ -1531,11 +1546,11 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 	KillDataFolder tmp_reviewDF
 	
 	WaveStats/Q accw
-	Variable acc = V_npnts
+	Variable acctot = V_npnts
 	WaveStats/Q rejw
-	Variable rej = V_npnts
+	Variable rejtot = V_npnts
 	Print "Reviewed " + num2str(curvesdone) + " out of " + num2str(totalcurves) + " total curves"
-	Print "Accepted " + num2str(acc) + ", rejected " + num2str(rej)	
+	Print "Total:  Accepted " + num2str(acctot) + ", rejected " + num2str(rejtot)
 End
 
 Function ReviewCurves_Button(ctrlName)
@@ -1569,6 +1584,10 @@ Function ReviewCurves_Button(ctrlName)
 				zoom = 0
 			endif
 			PlotFC_setzoom(zoom)
+			break
+		case "stopb":
+			Variable/G :tmp_reviewDF:choice = 4
+			DoWindow/K tmp_reviewDialog
 			break
 	endswitch
 End
