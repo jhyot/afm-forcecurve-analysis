@@ -294,9 +294,9 @@ Function AnalyseBrushHeight1(index, wNames, wHeights)
 	// write back curves to 2d wave
 	fc_expfit[][index] = expfit[p]
 	
-	// Point in FC where force is 1 pN higher than expfit baseline
+	// Point in FC where force is given amount higher than expfit baseline
 	// equals brush start (defined arbitrarily)
-	Variable heightP = BinarySearch(expfit, W_coef[0]+1)
+	Variable heightP = BinarySearch(expfit, W_coef[0] + ksBrushCutoff)
 	if (heightP < 0)
 		Print wname + ": Brush start point not found"
 		return -1
