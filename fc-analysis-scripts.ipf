@@ -7,13 +7,6 @@
 #include ":plotting-code"		// PlotFC
 
 
-// TODO
-// enhance retraction curve handling
-// Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
-// Make button in heightimage and heightmap for inspect mode (i.e. be able to turn off inspect mode)
-// indicate flagged curves in review
-
-
 // **** USER CONFIGURABLE CONSTANTS ****
 //
 // Change constants to adjust procedure behaviour
@@ -46,6 +39,19 @@ Constant ksHardwallFitFraction = 0.02	// defines end of hardwall part, the close
 //
 // **** END USER CONFIGURABLE CONSTANTS ****
 //
+
+
+
+
+// TODO
+// enhance retraction curve handling
+// Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
+// Make button in heightimage and heightmap for inspect mode (i.e. be able to turn off inspect mode)
+// indicate flagged curves in review
+// Running analysis more than once changes the data (because LSB->V->nm->N transformation happens
+//		inline in fc wave)
+
+
 
 
 // Create Igor Menu
