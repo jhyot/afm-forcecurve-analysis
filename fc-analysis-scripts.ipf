@@ -1429,7 +1429,8 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 	// Create temporary data folder for the duration of the review
 	NewDataFolder/O tmp_reviewDF
 	
-	// default zoom level 1 (0: autoscale; 1,2 increasing zoom)
+	// default zoom level 1
+	// (0: autoscale; higher numbers increasing zoom; see PlotFC_setzoom)
 	Variable/G :tmp_reviewDF:defzoom = 1
 	
 	for (i=0; i < wavesize; i+=1)
@@ -1474,7 +1475,7 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 			Button zoomb,proc=ReviewCurves_Button
 			Button unzoomb,pos={135,165},size={100,40},title="Unzoom"
 			Button unzoomb,proc=ReviewCurves_Button
-			PopupMenu defzoompop,pos={240,180},mode=(defzoom+1),value="0;1;2;"
+			PopupMenu defzoompop,pos={240,180},mode=(defzoom+1),value="0;1;2;3"
 			PopupMenu defzoompop,proc=ReviewCurves_ChgDefzoom
 						
 			Button redob,pos={30,220},size={100,40},title="Redo last"
@@ -1556,11 +1557,17 @@ Function ReviewCurves_Button(ctrlName)
 			DoWindow/K tmp_reviewDialog			// Kill self
 			break
 		case "zoomb":
-			zoom = (zoom==0 ? 1 : 2)
+			zoom += 1
+			if (zoom > 3)
+				zoom = 3
+			endif
 			PlotFC_setzoom(zoom)
 			break
 		case "unzoomb":
-			zoom = 0
+			zoom -= 1
+			if (zoom < 0)
+				zoom = 0
+			endif
 			PlotFC_setzoom(zoom)
 			break
 	endswitch

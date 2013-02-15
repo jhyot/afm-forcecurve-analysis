@@ -123,19 +123,28 @@ End
 Function PlotFC_zoom(cname) : ButtonControl
 	String cname
 	
-	NVAR plotFCzoom = :internalvars:plotFCzoom
+	GetWindow kwTopWin, userdata
+	Variable zoomlvl = NumberByKey("zoomlvl", S_Value)
 	
 	strswitch (cname)
 		case "zoomb":
-			plotFCzoom = (plotFCzoom==0 ? 1 : 2)
+			zoomlvl += 1
+			if (zoomlvl > 3)
+				zoomlvl = 3
+			endif
 			break
 			
 		case "unzoomb":
-			plotFCzoom = 0
+			zoomlvl -= 1
+			if (zoomlvl < 0)
+				zoomlvl = 0
+			endif
 			break
 	endswitch
 	
-	PlotFC_setzoom(plotFCzoom)
+	PlotFC_setzoom(zoomlvl)
+	String udata = ReplaceNumberByKey("zoomlvl", S_Value, zoomlvl)
+	SetWindow kwTopWin, userdata=udata
 	
 End
 
@@ -147,7 +156,7 @@ Function PlotFC_showcurves(cname) : ButtonControl
 	
 	// Get fc number
 	GetWindow kwTopWin, userdata
-	Variable index = str2num(S_Value)
+	Variable index = NumberByKey("index", S_Value)
 	
 	if (numtype(index) != 0)
 		// Not a normal number, do nothing, since we don't know what curve we have
@@ -203,10 +212,14 @@ Function PlotFC_setzoom(level)
 			SetAxis/A
 			break
 		case 1:
+			SetAxis/A left
+			SetAxis bottom -5, 80
+			break
+		case 2:
 			SetAxis left -35,250
 			SetAxis bottom -5,120
 			break
-		case 2:
+		case 3:
 			SetAxis left -35,150
 			SetAxis bottom -5,75
 			break
