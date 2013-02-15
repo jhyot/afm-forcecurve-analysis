@@ -251,7 +251,7 @@ Function PutDFNameOnGraph()
 	endif
 	
 	df = TidyDFName(df)
-	TextBox/C/N=dfname/F=0/A=LB/X=.5/Y=.1/E=2 "\\Zr075" + df
+	TextBox/C/N=dfname/F=0/A=LB/X=.5/Y=.1/E=2 "\\Zr085" + df
 End
 
 
