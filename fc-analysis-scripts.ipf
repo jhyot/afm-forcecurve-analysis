@@ -37,10 +37,11 @@ StrConstant ksFileType = "FVOL"
 StrConstant ksHeaderEnd = "\\*File list end"
 
 // Brush height calculation parameters
-Constant ksBaselineFitLength = .3	// Fraction of points used for baseline fits
-Constant ksBrushCutoff = 3	// height from force in exponential fit (in pN)
-Constant ksBrushOverNoise = 1		// height from point on curve above noise multiplied by this factor
- 
+Constant ksBaselineFitLength = .3		// Fraction of points used for baseline fits
+Constant ksBrushCutoff = 45			// height from force in exponential fit (in pN)
+Constant ksBrushOverNoise = 1			// height from point on curve above noise multiplied by this factor
+Constant ksHardwallFitFraction = 0.02	// defines end of hardwall part, the closer to 0, the less of curve
+												// gets fitted (useful values 0.01 - 0.1) 
 
 //
 // **** END USER CONFIGURABLE CONSTANTS ****

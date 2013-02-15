@@ -38,6 +38,8 @@ Function Analysis()
 			conflict = 1
 		elseif (ksBrushOverNoise != NumberByKey("ksBrushOverNoise", params))
 			conflict = 1
+		elseif (ksHardwallFitFraction != NumberByKey("ksHardwallFitFraction", params))
+			conflict = 1
 		endif
 	else
 		String/G :internalvars:analysisparameters = ""
@@ -60,6 +62,7 @@ Function Analysis()
 	params = ReplaceNumberByKey("ksBaselineFitLength", params, ksBaselineFitLength)
 	params = ReplaceNumberByKey("ksBrushCutoff", params, ksBrushCutoff)
 	params = ReplaceNumberByKey("ksBrushOverNoise", params, ksBrushOverNoise)
+	params = ReplaceNumberByKey("ksHardwallFitFraction", params, ksHardwallFitFraction)
 	
 	
 	// Create 2d waves for Analysis
@@ -560,7 +563,7 @@ Function AnalyseBrushHeight3(index, wNames, wHeights)
 	Duplicate/O w2, w3
 	Smooth/M=0 501, w3
 	WaveStats/Q w3
-	EdgeStats/Q/A=30/P/R=[V_minRowLoc, blFitStart]/F=0.01 w3
+	EdgeStats/Q/A=30/P/R=[V_minRowLoc, blFitStart]/F=(ksHardwallFitFraction) w3
 	
 	Variable hardwallPt = round(V_EdgeLoc1)
 	header += "hardwallPt:" + num2str(hardwallPt) + ";"
