@@ -621,8 +621,10 @@ Function AnalyseBrushHeight3(index, wNames, wHeights)
 		
 	
 	// Extract contact point as point above noise.
-	// Noise = StDev from last part of curve
-	WaveStats/Q/R=[round(lastGoodPt*(1-ksBaselineFitLength)), lastGoodPt] smth
+	// Noise = StDev from first part of baseline (as found above)
+	WaveStats/Q/R=[blFitStart, blFitStart + round(lastGoodPt*ksBaselineFitLength)] w
+	header += "blNoiseRaw:" + num2str(V_sdev) + ";"
+	WaveStats/Q/R=[blFitStart, blFitStart + round(lastGoodPt*ksBaselineFitLength)] smth
 	header += "blNoise:" + num2str(V_sdev) + ";"
 	
 	// Brush height as first point above noise multiplied by a factor
