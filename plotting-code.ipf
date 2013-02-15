@@ -10,10 +10,12 @@ Function ShowImage()
 End
 
 // Displays new graph with image in parameter
+// Returns graph name
 Function/S RecreateImage(img)
 	String img	// name of image wave to be displayed
 	
-	Display/W=(30,55,30+387,55+358)
+	String name = MakeGraphName("image")
+	Display/N=$name/W=(30,55,30+387,55+358)
 	AppendImage $img
 	ModifyImage $img ctab={*,*,Gold,0}
 	ModifyGraph width=300,height=300,margin(right)=90
@@ -31,7 +33,8 @@ End
 Function ShowResultMap()
 	SVAR resultwave = :internalvars:resultwave
 
-	Display/W=(30+430,55,30+387+430,55+358)
+	String name = MakeGraphName("result")
+	Display/N=$name/W=(30+430,55,30+387+430,55+358)
 	AppendImage $resultwave
 	
 	String/G :internalvars:resultgraph=S_name
@@ -63,7 +66,8 @@ Function PlotFC(index)
 	
 	WAVE fc, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
 	
-	Display/K=1 fc[][index] vs fc_x_tsd[][index]
+	String name = MakeGraphName("fc" + num2str(index) + "_plot")
+	Display/N=$name/K=1 fc[][index] vs fc_x_tsd[][index]
 
 	if (fc_expfit[0][index])
 		AppendToGraph/W=$S_name fc_expfit[][index]
@@ -250,6 +254,18 @@ Function/S TidyDFName(df)
 	
 	return df
 End
+
+// Makes and returns graph name like:
+// <datafolder>_<suffix>
+Function/S MakeGraphName(suffix)
+	String suffix
+	
+	String name = TidyDFName(GetDataFolder(1))
+	name = ReplaceString(":", name, "_")
+	
+	name = name + "_" + suffix
+	
+	return name
 End
 
 

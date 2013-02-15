@@ -13,7 +13,8 @@ Function absrelheights(img, bheights, added, nobrushrel, nobrushabs)
 	addedw += bheightsw
 	
 	// Display "absolute brush heights" image graph
-	Display
+	String name = MakeGraphName("heightsabs")
+	Display/N=$name
 	Appendimage addedw
 	ModifyImage $added ctab={*,*,Gold,0}
 	ModifyGraph width=300,height=300, margin(right)=90
@@ -32,6 +33,8 @@ Function scatterplots(img, bheights, added, nobrushrel, nobrushabs)
 	WAVE bheightsw = $bheights
 	WAVE addedw = $added
 	
+	String graphname = ""
+	
 	// Create relative "zero brush height" line (y = -x)
 	Make/N=10/O $nobrushrel
 	WAVE nobrushrelw = $nobrushrel
@@ -40,7 +43,8 @@ Function scatterplots(img, bheights, added, nobrushrel, nobrushabs)
 	nobrushrelw = -x
 	
 	// Display scatterplot relative brush heights
-	Display bheightsw vs imgw
+	graphname = "scatter_rel"
+	Display/N=$graphname bheightsw vs imgw
 	ModifyGraph marker=19,msize=1.5,rgb=(0,0,0),mode=3
 	AppendToGraph nobrushrelw
 	SetAxis/A
@@ -59,7 +63,8 @@ Function scatterplots(img, bheights, added, nobrushrel, nobrushabs)
 	nobrushabsw = x
 	
 	// Display scatterplot absolute brush heights
-	Display addedw vs imgw
+	graphname = "scatter_abs"
+	Display/N=$graphname addedw vs imgw
 	ModifyGraph marker=19,msize=1.5,rgb=(0,0,0),mode=3
 	AppendToGraph nobrushabsw
 	SetAxis/A
