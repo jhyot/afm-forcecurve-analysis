@@ -64,49 +64,14 @@ End
 Function PlotFC(index)
 	Variable index
 	
-	WAVE fc, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
-	
 	String name = MakeGraphName("fc" + num2str(index) + "_plot")
-	Display/N=$name/K=1 fc[][index] vs fc_x_tsd[][index]
+	Display/N=$name/K=1
+	
+	PlotFC_plotdata(index)
+	
+	PutDFNameOnGraph()
 
-	if (fc_expfit[0][index])
-		AppendToGraph/W=$S_name fc_expfit[][index]
-	elseif (fc_smth[0][index])
-		AppendToGraph/W=$S_name fc_smth[][index] vs fc_smth_xtsd[][index]
-	endif
-	
-	ModifyGraph rgb[0]=(0,15872,65280)
-	ModifyGraph rgb[1]=(65280,0,0)
-	
-
-	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
-	Label left "\\Z13force (pN)"
-	Label bottom "\\Z13tip-sample distance (nm)"
-	SetAxis left -25,250
-	SetAxis bottom -5,120
-	ModifyGraph zero=8
-	
-	WAVE brushheights
-	
-	String text, text2
-	text = "FC: " + num2str(index) + ";   X: " + num2str(mod(index,ksFVRowSize))
-	text += "; Y:" + num2str(floor(index/ksFVRowSize))
-	sprintf text2, "\rBrush height: %.2f nm", brushheights[index]
-	TextBox/A=RT (text + text2)
-	
-	// Draw drop-line at brush height
-	if (brushheights[index])
-		SetDrawEnv xcoord=bottom, ycoord=prel, dash=11
-		DrawLine brushheights[index],0.3, brushheights[index],1.05
-	endif
-	
 	ShowInfo
-	
-	// Put curve index into window userdata
-	SetWindow kwTopWin, userdata=num2str(index)
-	
-	
-	Variable/G :internalvars:plotFCzoom = 1
 	
 	ControlBar/T 30
 	
@@ -118,7 +83,137 @@ Function PlotFC(index)
 	// Save in userdata whether curve is shown at the moment
 	Button showapproach,title="Hide approach",size={80,20},userdata="1",proc=PlotFC_showcurves
 	Button showretract,title="Show retract",size={80,20},userdata="0",proc=PlotFC_showcurves
+	
+	SetWindow kwTopWin,hook(fcnavigate)=PlotFC_navigate
 End
+
+
+Function PlotFC_plotdata(index)
+	Variable index		// force curve number to plot
+
+	
+	// Somewhat of a temporary "hack" to switch off parts of code
+	// mode==0, draw all parts
+	// mode==1, draw only raw curve and remove brush height info
+	Variable mode = 1
+	
+	
+	WAVE fc, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
+	
+	// Remove all previous traces
+	Variable numtraces = ItemsInList(TraceNameList("", ";", 1))
+	Variable i=0
+	String t=""
+	for (i=0; i < numtraces; i+=1)
+		RemoveFromGraph $"#0"		// remove the currently first trace, others shift up
+	endfor
+	
+	AppendToGraph fc[][index] vs fc_x_tsd[][index]
+
+	if (fc_expfit[0][index])
+		AppendToGraph fc_expfit[][index]
+	elseif (fc_smth[0][index])
+		if (mode==0)
+			AppendToGraph fc_smth[][index] vs fc_smth_xtsd[][index]
+		endif
+	endif
+
+	ModifyGraph rgb[0]=(0,15872,65280)
+	
+	// Sometimes no second trace (if curve could not be analysed e.g.)
+	if (ItemsInList(TraceNameList("", ";", 1)) > 1)
+		ModifyGraph rgb[1]=(65280,0,0)
+	endif
+	
+
+	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
+	Label left "\\Z13force (pN)"
+	Label bottom "\\Z13tip-sample distance (nm)"
+	ModifyGraph zero=8
+	
+	Variable zoomlvl = 1
+	PlotFC_setzoom(zoomlvl)	
+	
+	WAVE brushheights
+	
+	String text="", text2=""
+	text = "FC: " + num2str(index) + ";   X: " + num2str(mod(index,ksFVRowSize))
+	text += "; Y:" + num2str(floor(index/ksFVRowSize))
+
+	if (mode==0)
+		sprintf text2, "\rBrush height: %.2f nm", brushheights[index]
+	endif
+	TextBox/C/N=fcinfobox/A=RT (text + text2)
+	
+	// Draw drop-line at brush height
+	if (brushheights[index])
+		DrawAction delete
+		SetDrawEnv xcoord=bottom, ycoord=prel, dash=11
+		if (mode==0)
+			DrawLine brushheights[index],0.3, brushheights[index],1.05
+		endif
+	endif
+	
+	// Put curve index and zoom level into window userdata
+	String udata = ""
+	sprintf udata, "index:%d;zoomlvl:%d;", index, zoomlvl
+	SetWindow kwTopWin, userdata=udata
+End
+
+
+Function PlotFC_navigate(s)
+	STRUCT WMWinHookStruct &s
+	
+	Variable defZoom = 1
+	
+	Variable ret = 0
+	
+	// keyboard events with ctrl pressed
+	if (s.eventCode == 11 && s.eventmod == 8)
+		GetWindow kwTopWin, userdata
+		Variable index = NumberByKey("index", S_Value)
+		switch (s.keycode)
+			case 28:		// left arrow
+				index -= 1
+				PlotFC_plotdata(index)
+				ret = 1
+				break
+			
+			case 29:		// right arrow
+				index += 1
+				PlotFC_plotdata(index)
+				ret = 1
+				break
+				
+			case 30:		// up arrow
+				index += 32
+				PlotFC_plotdata(index)
+				ret = 1
+				break
+				
+			case 31:		// down arrow
+				index -= 32
+				PlotFC_plotdata(index)
+				ret = 1
+				break
+		endswitch
+	endif
+	
+	// if updated plot, set default zoom level and redraw markers on the images
+	if (ret == 1)
+		PlotFC_setzoom(defZoom)
+		
+		SVAR imagegraph = :internalvars:imagegraph
+		SVAR resultgraph = :internalvars:resultgraph
+		Variable pixelX = mod(index, ksFVRowSize)
+		Variable pixelY = floor(index/ksFVRowSize)
+		DrawPointMarker(imagegraph, pixelX, pixelY, 1)
+		DrawPointMarker(resultgraph, pixelX, pixelY, 1)
+	endif
+	
+	return ret
+End
+
 
 Function PlotFC_zoom(cname) : ButtonControl
 	String cname
