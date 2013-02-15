@@ -1337,7 +1337,10 @@ Function ReviewCurvesFlagged()
 				filter[i] = 1
 			else
 				heights_acc[i] = heights[i]
-				autoacc += 1
+				if (numtype(heights[i]) == 0)
+					// normal number
+					autoacc += 1
+				endif
 			endif
 		endif
 	endfor
