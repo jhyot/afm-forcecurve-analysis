@@ -1634,9 +1634,11 @@ Function PrintInfo()
 	SVAR rw = :internalvars:resultwave
 	SVAR sel = :internalvars:selectionwave
 	SVAR path = :internalvars:totalpath
+	SVAR params = :internalvars:analysisparameters
 	printf "IMAGE graph: %s,  wave: %s\r", ig, iw
 	printf "BRUSHHEIGHTS graph: %s,  wave: %s\r", rg, rw
 	printf "selectionwave: %s,  totalpath: %s\r", sel, path
+	printf "analysis parameters: %s\r", params
 End
 
 Function PrintInfoDF(df)
