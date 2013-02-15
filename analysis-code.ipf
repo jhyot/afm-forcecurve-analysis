@@ -155,7 +155,7 @@ End
 //
 // NOTE: A lot of parameters/assumptions are hardcoded here for brush extend FC curves with 4096 points
 // (todo: change this in future)
-Function AnalyseBrushHeight(index, wNames, wHeights)
+Function AnalyseBrushHeight1(index, wNames, wHeights)
 	Variable index
 	WAVE/T wNames
 	WAVE wHeights
