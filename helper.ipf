@@ -29,9 +29,18 @@ End
 Function scatterplots(img, bheights, added, nobrushrel, nobrushabs)
 	String img, bheights, added, nobrushrel, nobrushabs
 	
+	Variable doabs = 1
+	if (cmpstr(added, "") == 0)
+		// skip absolute brush height
+		doabs = 0
+	endif
+	
 	WAVE imgw = $img
 	WAVE bheightsw = $bheights
-	WAVE addedw = $added
+	
+	if (doabs)
+		WAVE addedw = $added
+	endif
 	
 	String graphname = ""
 	
@@ -56,27 +65,29 @@ Function scatterplots(img, bheights, added, nobrushrel, nobrushabs)
 	PutDFNameOnGraph()
 	DoUpdate
 	
-	// Create absolute "zero brush height" line (y=x)
-	Make/N=10/O $nobrushabs
-	WAVE nobrushabsw = $nobrushabs
-	SetScale/I x, V_min, V_max, nobrushabsw
-	nobrushabsw = x
-	
-	// Display scatterplot absolute brush heights
-	graphname = "scatter_abs"
-	Display/N=$graphname addedw vs imgw
-	ModifyGraph marker=19,msize=1.5,rgb=(0,0,0),mode=3
-	AppendToGraph nobrushabsw
-	SetAxis/A
-	ModifyGraph standoff(bottom)=0
-	Label left "absolute brush height (nm)\r(feature depth + brush height)"
-	Label bottom "feature depth (nm)"
-	ModifyGraph lblMargin(left)=10
-	ModifyGraph zero=1
-	Tag/C/N=hardwall/AO=1/X=0/Y=-5/B=1/G=(65280,0,0)/F=0/L=0 $nobrushabs, ((V_min+V_max)/2), "hardwall"
-	Tag/C/N=surface/O=0/X=7/Y=.5/B=1/G=(0,0,0)/F=0/L=0 left, 0, "gold surface"
-	PutDFNameOnGraph()
-	DoUpdate
+	if (doabs)
+		// Create absolute "zero brush height" line (y=x)
+		Make/N=10/O $nobrushabs
+		WAVE nobrushabsw = $nobrushabs
+		SetScale/I x, V_min, V_max, nobrushabsw
+		nobrushabsw = x
+		
+		// Display scatterplot absolute brush heights
+		graphname = "scatter_abs"
+		Display/N=$graphname addedw vs imgw
+		ModifyGraph marker=19,msize=1.5,rgb=(0,0,0),mode=3
+		AppendToGraph nobrushabsw
+		SetAxis/A
+		ModifyGraph standoff(bottom)=0
+		Label left "absolute brush height (nm)\r(feature depth + brush height)"
+		Label bottom "feature depth (nm)"
+		ModifyGraph lblMargin(left)=10
+		ModifyGraph zero=1
+		Tag/C/N=hardwall/AO=1/X=0/Y=-5/B=1/G=(65280,0,0)/F=0/L=0 $nobrushabs, ((V_min+V_max)/2), "hardwall"
+		Tag/C/N=surface/O=0/X=7/Y=.5/B=1/G=(0,0,0)/F=0/L=0 left, 0, "gold surface"
+		PutDFNameOnGraph()
+		DoUpdate
+	endif
 End
 
 Function plot_color(hole, edge, top, textpos)
