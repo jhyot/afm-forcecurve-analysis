@@ -116,11 +116,11 @@ Function plot_color(hole, edge, top, textpos)
 	// Put text above regions
 	SetDrawEnv save, fstyle=1, ycoord=left, xcoord=bottom
 	SetDrawEnv textrgb=(0,0,65280)
-	DrawText ((V_min+hole)/2)-0.04*brange, textpos, "hole"
+	DrawText ((V_min+hole)/2)-0.035*brange, textpos, "hole"
 	SetDrawEnv textrgb=(52224,34816,0)
-	DrawText ((hole+edge)/2)-0.05*brange, textpos, "edge"
+	DrawText ((hole+edge)/2)-0.03*brange, textpos, "edge"
 	SetDrawEnv textrgb=(0,26112,13056)
-	DrawText ((edge+top)/2)-0.07*brange, textpos, "surface"
+	DrawText ((edge+top)/2)-0.05*brange, textpos, "surface"
 End
 
 
