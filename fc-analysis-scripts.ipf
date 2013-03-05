@@ -85,7 +85,7 @@ Function LoadandAnalyseAll()
 	endif
 	
 	Variable i
-	String/G headerstuff
+	String/G fvmeta
 	String/G :internalvars:selectionwave = "selectedcurves"
 	SVAR selectionwave = :internalvars:selectionwave
 
@@ -95,7 +95,7 @@ Function LoadandAnalyseAll()
 	Wave sel=$selectionwave
 
 	for(i=0;i<(ksFVRowSize*ksFVRowSize);i+=1)
-		sel[i] = NumberByKey("dataOffset", headerstuff) + ksFCPoints*2*2*i
+		sel[i] = NumberByKey("dataOffset", fvmeta) + ksFCPoints*2*2*i
 	endfor
 
 	SVAR totalpath = :internalvars:totalpath
@@ -339,20 +339,18 @@ Function ReadMap(fileName)
 	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
 
 	Variable result
-	Variable index=0
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
-	Variable success=0
-	String headerData, image
+	String headerData
 	
 	// Read and parse FC file header
-	result = ParseFCHeader(fileName, "fullHeader", "subGroupTitles", headerData)
+	result = ParseFVHeader(fileName, "fullHeader", "subGroupTitles", headerData)
 	
 	if (result < 0)
 		print "Could not parse force volume header correctly"
 		return -1
 	endif
 	
-	String/G headerstuff=headerData
+	String/G fvmeta=headerData
 	
 	String imagemeta = ""
 	result = ParseImageHeader(fileName, "imageheader", "imagetitles", imagemeta)
@@ -469,12 +467,12 @@ Function ChooseFVs_button(ctrl) : ButtonControl
 			break
 		
 		case "sall":
-			String/G headerstuff
+			String/G fvmeta
 			SVAR selectionwave = :internalvars:selectionwave
 			WAVE sel=$selectionwave
 			Variable i
 			for(i=0;i<(ksFVRowsize*ksFVRowSize);i+=1)
-				sel[i]=NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*2*i
+				sel[i]=NumberByKey("dataOffset", fvmeta)+ksFCPoints*2*2*i
 			endfor	
 			break
 	endswitch
@@ -487,7 +485,7 @@ Function chooser(s)
 	STRUCT WMWinHookStruct &s
 	Variable rval = 0
 	SVAR selectionwave = :internalvars:selectionwave
-	String/G headerstuff
+	String/G fvmeta
 	SVAR imagegraph = :internalvars:imagegraph
 
 	// React only on left mousedown
@@ -504,7 +502,7 @@ Function chooser(s)
 			DrawPointMarker(imagegraph, pixelX, pixelY, 0)
 			
 			// Write selected fc offset to selection wave
-			Variable offs = NumberByKey("dataOffset", headerstuff)+ksFCPoints*2*fcnum*2
+			Variable offs = NumberByKey("dataOffset", fvmeta)+ksFCPoints*2*fcnum*2
 			WAVE sel=$selectionwave
 			
 			sel[fcnum] = offs
@@ -527,7 +525,7 @@ Function ReadAllFCs(fileName)
 	Variable index=0
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
-	String/G headerstuff
+	String/G fvmeta
 	SVAR selectionwave = :internalvars:selectionwave
 	SVAR imagegraph = :internalvars:imagegraph
 
@@ -557,7 +555,7 @@ Function ReadAllFCs(fileName)
 				fc[][index] = fcloaded[p]
 				rfc[][index] = rfcloaded[p]
 				
-				fcmeta[index] = headerstuff
+				fcmeta[index] = fvmeta
 				// Increment number of successfully read files
 				success += 1
 			else
@@ -711,7 +709,7 @@ Function GetHeaderSectionTitles(headerwave, titleswave)
 	String headerwave		// Name of the text wave with the header lines (must exist and be populated)
 	String titleswave		// Name of the text wave where the section titles will be written to (will be overwritten)
 	
-	Make/T/O/N=0 $titleswave
+	Make/T/O/N=0 $titleswave = ""
 
 	WAVE/T fullHeader = $headerwave
 	WAVE/T subGroupTitles = $titleswave
@@ -749,7 +747,7 @@ Function ParseFCHeader(fileName, headerwave, titleswave, headerData)
 	headerData = ""
 	
 	
-	result = ReadFCHeaderLines(fileName, headerwave)
+	result = ReadHeaderLines(fileName, headerwave)
 	if (result != 0)
 		Print fileName + ": Did not find header end"
 		return -1
@@ -944,7 +942,7 @@ Function ParseImageHeader(fileName, headerwave, titleswave, headerData)
 
 	Variable success = 0
 	
-	result = ReadFCHeaderLines(fileName, headerwave)
+	result = ReadHeaderLines(fileName, headerwave)
 	if (result != 0)
 		Print fileName + ": Did not find header end"
 		return success
@@ -1083,12 +1081,12 @@ Function ParseImageHeader(fileName, headerwave, titleswave, headerData)
 
 End
 
-// Read FC file given by fileName.
+// Read file given by fileName.
 // Add all lines into a new text wave
 // return 0 if end of header found (defined by ksHeaderEnd)
 // -1 otherwise.
 // Last line of header not included in header wave.
-Function ReadFCHeaderLines(filename, headerwave)
+Function ReadHeaderLines(filename, headerwave)
 	String filename			// Full Igor-style path to filename ("folder:to:file.ext")
 	String headerwave		// Name of the text wave for header data (will be overwritten)
 	
