@@ -379,6 +379,78 @@ Function ReadMap(fileName)
 End
 
 
+Function ReadMapSingleFCs(path)
+	String path				// Path string to folder with FCs
+	
+	if (strlen(path)==0)				// If no path specified, create one
+		NewPath/O/Q tempFCpath			// This will put up a dialog
+		if (V_flag != 0)
+			return -1						// User cancelled
+		endif
+	else
+		NewPath/O/Q tempFCpath, path
+	endif
+	
+	String filename = ""
+	Make/T/FREE/N=0 filenames = ""
+	//WAVE/T filenames
+	Variable n = 0
+	Variable i = 0
+	// Loop through each file in folder
+	do											
+		filename = IndexedFile(tempFCpath, i, "????")
+		if (strlen(fileName) == 0)					
+			break			// No more files
+		endif
+		
+		n = numpnts(filenames)
+		Redimension/N=(n+1) filenames
+		filenames[i] = filename
+		
+		i += 1	
+	while (1)
+	
+	// Sort filenames explicitly, because the order returned by
+	// the operating system might be arbitrary.
+	Sort filenames, filenames
+	
+	Variable result = -1
+	n = numpnts(filenames)
+	PathInfo tempFCpath
+	String pathstr = S_path
+	
+	Make/O/T/N=0 fcmeta = ""
+	WAVE/T fcmeta
+	
+	Variable numread = 0
+	
+	String fullFilename = ""
+	String headerData = ""
+	
+	for (i=0; i < n; i+=1)
+		fullFilename = pathstr + filenames[i]
+		headerData = ""
+		result = ParseFCHeader(fullFilename, "fullheader", "subGroupTitles", headerData)
+		
+		if (result < 0)
+			print fullFilename + ": not included"
+			continue
+		endif
+		
+		headerData += "filename:" + fullFilename
+		
+		Redimension/N=(numread + 1) fcmeta
+		fcmeta[numread] = headerData
+		
+		numread += 1		
+	endfor
+	
+	if (Exists("tempFCpath"))
+		KillPath tempFCpath
+	endif
+End
+
+
 
 Function ChooseForceCurves()
 
