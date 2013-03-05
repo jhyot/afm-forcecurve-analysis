@@ -422,6 +422,9 @@ Function ReadMapSingleFCs(path)
 	Make/O/T/N=0 fcmeta = ""
 	WAVE/T fcmeta
 	
+	Make/O/N=0 fc_z = NaN 
+	WAVE fc_z
+	
 	Variable numread = 0
 	
 	String fullFilename = ""
@@ -439,11 +442,17 @@ Function ReadMapSingleFCs(path)
 		
 		headerData += "filename:" + fullFilename
 		
-		Redimension/N=(numread + 1) fcmeta
+		Redimension/N=(numread+1) fcmeta
 		fcmeta[numread] = headerData
 		
-		numread += 1		
+		Redimension/N=(numread+1) fc_z
+		fc_z[numread] = GetZPos(numread)
+		
+		numread += 1
+		print fullFilename + ": ok"
 	endfor
+	
+	print num2str(numread) + " files read successfully"
 	
 	if (Exists("tempFCpath"))
 		KillPath tempFCpath
@@ -451,6 +460,43 @@ Function ReadMapSingleFCs(path)
 End
 
 
+// Reads height sensor (Zsensor) data from file according to metadata
+// And takes highest value of retract curve as Z height of the pixel
+Function GetZPos(index)
+	Variable index
+	
+	WAVE/T fcmeta
+	
+	String meta = fcmeta[index]
+	
+	String filename = StringByKey("filename", meta)
+	Variable offs = NumberByKey("ZdataOffset", meta)
+	Variable VperLSB = NumberByKey("ZVPerLSB", meta)
+	Variable zsens = NumberByKey("ZSens", meta)
+	
+	Variable zval = NaN
+	
+	GBLoadWave/N=fczload/B/Q/S=(offs)/T={16,4}/U=(ksFCPoints)/W=2 filename
+
+	if (V_flag == 2)
+		String fczname = StringFromList(0, S_waveNames)
+		String rfczname = StringFromList(1, S_waveNames)
+		WAVE fcz = $fczname
+		WAVE rfcz = $rfczname
+		
+		rfcz *= VperLSB
+		rfcz *= zsens
+		
+		WaveStats/Q rfcz
+		zval = V_min
+	else
+		print filename + ": Couldn't find 2 force curves in Zsensor binary data (index " + num2str(index) + ")"
+	endif
+	
+	KillWaves/Z $fczname, $rfczname
+	
+	return zval
+End
 
 Function ChooseForceCurves()
 
