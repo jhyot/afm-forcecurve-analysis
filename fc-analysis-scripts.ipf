@@ -21,8 +21,9 @@ Constant ksFCPoints = 4096
 // Tested with 32 and 16 pixels per row
 Constant ksFVRowSize = 32
 
-// FC file type as written in header
-StrConstant ksFileType = "FVOL"
+// File types as written in header
+StrConstant ksFileTypeFV = "FVOL"
+StrConstant ksFileTypeFC = "FOL"
 
 // String to be matched (full match, case insensitive) at header end
 StrConstant ksHeaderEnd = "\\*File list end"
@@ -721,23 +722,347 @@ Function GetHeaderSectionTitles(headerwave, titleswave)
 		return -1			// Error
 	endif
 	
+	WAVE W_Index
+	Redimension/N=(numpnts(subGroupTitles), 2) subGroupTitles
+	subGroupTitles[][1] = num2str(W_Index[p])
+	
 	return 0	
 End
 
 
+Function/S Header_GetVersion(fullheader, subGroupTitles)
+	WAVE/T fullheader, subGroupTitles
+	
+	FindValue/TEXT="\\*Force file list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		return ""
+	endif
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+	
+	FindValue/S=(subGroupOffset)/TEXT="\\Version:" fullheader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return ""
+	endif
+	String s
+	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
+	
+	return s
+End
 
-// Read and parse FC file given by fileName
-// Write relevant info about FC into String headerData (pass by ref)
-// Return 0 if no errors, -1 otherwise
-//
-// headerData is in "key1:value1;key2:value2;" format
-// keys:
-// dataOffset		Byte offset to binary data start
-// rampSize			Z piezo ramp size in nm
-// VPerLSB			Vertical deflection V/LSB
-// deflSens			Deflection sensitivity nm/V
-// springConst		Spring constant nN/nm
-Function ParseFCHeader(fileName, headerwave, titleswave, headerData)
+
+Function/S Header_GetFiletype(fullheader, subGroupTitles)
+	WAVE/T fullheader, subGroupTitles
+	
+	FindValue/TEXT="\\*Force file list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		return ""
+	endif
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+	
+	FindValue/S=(subGroupOffset)/TEXT="\\Start context:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return ""
+	endif
+	String s
+	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
+
+	return s
+End
+
+
+Function Header_GetNumPoints(fullheader, subGroupTitles)
+	WAVE/T fullheader, subGroupTitles
+	
+	FindValue/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		return -1
+	endif
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+	
+	FindValue/S=(subGroupOffset)/TEXT="\\Samps/line:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return -1
+	endif
+	String s
+	SplitString/E=":\\s(\\d+)\\s\\d+$" fullHeader[V_value], s
+
+	return str2num(s)
+End
+
+
+Function Header_GetXPos(fullheader, subGroupTitles)
+	WAVE/T fullheader, subGroupTitles
+	
+	FindValue/TEXT="\\*Ciao scan list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		return NaN
+	endif
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+	
+	FindValue/S=(subGroupOffset)/TEXT="\\X Offset:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return NaN
+	endif
+	String s
+	SplitString/E=":\\s((-|\\+)?\\d+\\.?\\d*)\\s+nm$" fullHeader[V_value], s
+
+	return str2num(s)
+End
+
+
+Function Header_GetYPos(fullheader, subGroupTitles)
+	WAVE/T fullheader, subGroupTitles
+	
+	FindValue/TEXT="\\*Ciao scan list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		return NaN
+	endif
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+	
+	FindValue/S=(subGroupOffset)/TEXT="\\Y Offset:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return NaN
+	endif
+	String s
+	SplitString/E=":\\s((-|\\+)?\\d+\\.?\\d*)\\s+nm$" fullHeader[V_value], s
+
+	return str2num(s)
+End
+
+
+// Returns the data set number where the given data type is found
+// (-1 if no match)
+Function Header_FindDataType(fullheader, subGroupTitles, type)
+	WAVE/T fullheader, subGroupTitles
+	String type
+	
+	Variable start = -1
+	Variable groupOffs = -1
+	Variable i = -1
+	Variable found = 0
+	String s = ""
+	
+	Do
+		FindValue/S=(start+1)/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
+		if (V_value < 0)
+			break
+		endif
+		
+		i += 1
+		start = V_value
+		groupOffs = str2num(subGroupTitles[start][1])
+			
+		FindValue/S=(groupOffs)/TEXT="\\@4:Image Data:" fullHeader
+		if ((V_value < 0) || ((start < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[start+1][1]))))
+			return -1
+		endif
+
+		SplitString/E=":.*\\[(.+)\\]" fullHeader[V_value], s
+		
+		if (cmpstr(s, type) == 0)
+			found = 1
+			break
+		endif
+	While (1)
+	
+	if (found)
+		return i
+	else
+		return -1
+	endif
+End
+
+
+Function Header_GetDataOffset(fullheader, subGroupTitles, index)
+	WAVE/T fullheader, subGroupTitles
+	Variable index		// index'th data set in file (0-based)
+	
+	Variable start = -1
+	Variable i = -1
+	
+	Do
+		FindValue/S=(start+1)/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
+		if (V_value < 0)
+			break
+		endif
+		
+		i += 1
+		start = V_value
+	While (i < index)
+	
+	// Didn't find enough subgroups to get to the index'th one
+	if (i != index)
+		return -1
+	endif
+	
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+		
+	FindValue/S=(subGroupOffset)/TEXT="\\Data offset:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return -1
+	endif
+	String s
+	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
+
+	return str2num(s)
+End
+
+
+// Returns ramp size in nm
+Function Header_GetRampSize(fullheader, subGroupTitles, index)
+	WAVE/T fullheader, subGroupTitles
+	Variable index		// index'th data set in file (0-based)
+	
+	Variable start = -1
+	Variable i = -1
+	
+	Do
+		FindValue/S=(start+1)/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
+		if (V_value < 0)
+			break
+		endif
+		
+		i += 1
+		start = V_value
+	While (i < index)
+	
+	// Didn't find enough subgroups to get to the index'th one
+	if (i != index)
+		return -1
+	endif
+	
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+		
+	FindValue/S=(subGroupOffset)/TEXT="\\@4:Ramp size:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return -1
+	endif
+	String s
+	SplitString/E="\\)\\s(.+)\\sV$" fullHeader[V_value], s
+	Variable rampSizeV = str2num(s)	
+	
+	// Z piezo sensitivity
+	FindValue/TEXT="\\*Scanner list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		return -1
+	endif
+	subGroup = V_value
+	subGroupOffset = str2num(subGroupTitles[subGroup][1])
+	
+	FindValue/S=(subGroupOffset)/TEXT="\\@Sens. Zsens:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return -1
+	endif
+	SplitString/E=":\\sV\\s(.+)\\snm/V$" fullHeader[V_value], s
+
+	return rampSizeV * str2num(s)
+End
+
+
+Function Header_GetSpringConst(fullheader, subGroupTitles, index)
+	WAVE/T fullheader, subGroupTitles
+	Variable index		// index'th data set in file (0-based)
+	
+	Variable start = -1
+	Variable i = -1
+	
+	Do
+		FindValue/S=(start+1)/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
+		if (V_value < 0)
+			break
+		endif
+		
+		i += 1
+		start = V_value
+	While (i < index)
+	
+	// Didn't find enough subgroups to get to the index'th one
+	if (i != index)
+		return -1
+	endif
+	
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+		
+	FindValue/S=(subGroupOffset)/TEXT="\\Spring Constant:" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return -1
+	endif
+	String s
+	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
+
+	return str2num(s)
+End
+
+
+Function Header_GetLSBScale(fullheader, subGroupTitles, index)
+	WAVE/T fullheader, subGroupTitles
+	Variable index		// index'th data set in file (0-based)
+	
+	Variable start = -1
+	Variable i = -1
+	
+	Do
+		FindValue/S=(start+1)/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
+		if (V_value < 0)
+			break
+		endif
+		
+		i += 1
+		start = V_value
+	While (i < index)
+	
+	// Didn't find enough subgroups to get to the index'th one
+	if (i != index)
+		return -1
+	endif
+	
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+		
+	FindValue/S=(subGroupOffset)/TEXT="\\@4:Z scale: V" fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return -1
+	endif
+	String s
+	SplitString/E="\\]\\s\\((.+)\\sV/LSB\\)" fullHeader[V_value], s
+
+	return str2num(s)
+End
+
+
+Function Header_GetSens(fullheader, subGroupTitles, type)
+	WAVE/T fullheader, subGroupTitles
+	String type
+	
+	FindValue/TEXT="\\*Ciao scan list"/TXOP=4 subGroupTitles
+	if (V_value < 0)
+		return -1
+	endif
+	Variable subGroup = V_value
+	Variable subGroupOffset = str2num(subGroupTitles[subGroup][1])
+	
+	String searchtext = "\\@Sens. " + type + ":"
+	
+	FindValue/S=(subGroupOffset)/TEXT=(searchtext) fullHeader
+	if ((V_value < 0) || ((subGroup < DimSize(subGroupTitles,0)-1) && (V_value >= str2num(subGroupTitles[subGroup+1][1]))))
+		return -1
+	endif
+	String s
+	SplitString/E=":\\sV\\s(.+)\\snm/V$" fullHeader[V_value], s
+
+	return str2num(s)
+End
+
+
+Function ParseFCHeader(filename, headerwave, titleswave, headerData)
 	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
 	String headerwave		// Name of the text wave where full header will be saved to (will be overwritten)
 	String titleswave		// Name of the text wave where the section titles will be written to (will be overwritten)
@@ -763,160 +1088,228 @@ Function ParseFCHeader(fileName, headerwave, titleswave, headerData)
 	WAVE/T subGroupTitles = $titleswave
 	WAVE W_Index
 	
+	String s = ""
+	
 	
 	// ============================
 	// Extract relevant header data
 	// ============================
 	
-	FindValue/TEXT="\\*Force file list"/TXOP=4 subGroupTitles		// case insensitive full wave element search
-	if (V_value < 0)
-		Print filename + ": \\*Force file list not found"
-		return -1
-	endif
-	subGroupOffset = W_Index[V_value]
+	String version = Header_GetVersion(fullheader, subGroupTitles)
 	
-	// Check if correct version and filetype
-	String s
-	FindValue/S=(subGroupOffset)/TEXT="\\Version:" fullheader
-	if (V_value < 0)
-		Print filename + ": Version not found"
+	if (cmpstr(version, "") == 0)
+		Print filename + ": Version info not found"
 		return -1
 	endif
-	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
-	if (WhichListItem(s, ksVersionReq, ",") < 0)
+	if (WhichListItem(version, ksVersionReq, ",") < 0)
 		Print filename + ": File version not supported"
 		return -1
 	endif
-	FindValue/S=(subGroupOffset)/TEXT="\\Start context:" fullHeader
-	if (V_value < 0)
-		Print filename + ": File type not found"
-		return -1
-	endif
-	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
-	if (cmpstr(s, ksFileType, 1) != 0)
+		
+	String filetype = Header_GetFiletype(fullheader, subGroupTitles)
+	if (cmpstr(filetype, ksFileTypeFC) != 0)
 		Print filename + ": Wrong file type"
 		return -1
 	endif
 	
-	
-	// Check if correct number of points
-	FindValue/TEXT="\\*Ciao force image list"/TXOP=4 subGroupTitles
-	if (V_value < 0)
-		Print filename + ": \\*Ciao force image list not found"
-		return -1
-	endif
-	subGroupOffset = W_Index[V_value]
-	
-	// Get data offset
-	FindValue/S=(subGroupOffset)/TEXT="\Data offset:" fullHeader
-	if (V_value < 0)
-		Print filename + ": Data offset not found"
-		return -1
-	endif
-	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
-	if (str2num(s) <= 0)
-		Print filename + ": Data offset <= 0"
-		return -1
-	endif
-	headerData += "dataOffset:" + s + ";"
-	
-	FindValue/S=(subGroupOffset)/TEXT="\\Samps/line:" fullHeader
-	if (V_value < 0)
-		Print filename + ":Data points number not found"
-		return -1
-	endif
-	SplitString/E=":\\s(\\d+)\\s\\d+$" fullHeader[V_value], s
-	if (str2num(s) != ksFCPoints)
+	Variable fcpoints = Header_GetNumPoints(fullheader, subGroupTitles)
+	if (fcpoints != ksFCPoints)
 		Print filename + ": Wrong number of data points per curve"
 		return -1
 	endif
 	
-	// Get Z piezo ramp size in V
-	FindValue/S=(subGroupOffset)/TEXT="\\@4:Ramp size:" fullHeader
-	if (V_value < 0)
-		Print filename + ": Ramp size not found"
+	// returns NaN if didn't find x/y pos
+	Variable xpos = Header_GetXPos(fullheader, subGroupTitles)
+	Variable ypos = Header_GetYPos(fullheader, subGroupTitles)
+	if (numtype(xpos) == 2 || numtype(ypos) == 2)
+		Print filename + ": Didn't find X or Y position"
 		return -1
 	endif
-	SplitString/E="\\)\\s(.+)\\sV$" fullHeader[V_value], s
-	if (strlen(s) == 0)
-		Print filename + ": Ramp size invalid"
-		return -1
-	endif
-	Variable rampSizeV = str2num(s)
+	headerData += "xpos:" + num2str(xpos) + ";ypos:" + num2str(ypos) + ";"
 	
-	// Get spring constant in nN/nm
-	FindValue/S=(subGroupOffset)/TEXT="\\Spring Constant:" fullHeader
-	if (V_value < 0)
-		Print filename + ": Spring const. not found"
-		return -1
-	endif
-	SplitString/E=":\\s(.+)$" fullHeader[V_value], s
-	if (strlen(s) == 0)
-		Print filename + ": Spring const. invalid"
-		return -1
-	endif
-	headerData += "springConst:" + s + ";"
 	
-	// Get vertical deflection V/LSB
-	FindValue/S=(subGroupOffset)/TEXT="\\@4:Z scale: V" fullHeader
-	if (V_value < 0)
-		Print filename + ": Z scale not found"
+	// Deflection Error data
+	Variable index = Header_FindDataType(fullheader, subGroupTitles, "DeflectionError")
+	if (index < 0)
+		Print filename + ": Didn't find Deflection Error data"
 		return -1
 	endif
-	String s2
-	SplitString/E="\\[(.+)\\]\\s\\((.+)\\sV/LSB\\)" fullHeader[V_value], s2, s
-	if (cmpstr(s2, "Sens. DeflSens") != 0)
-		Print filename + ": FC data is not vertical deflection (" + s2 + ")"
+	
+	Variable offs = Header_GetDataOffset(fullheader, subGroupTitles, index)
+	if (offs <= 0)
+		Print filename + ": Deflection Error: Data offset invalid"
 		return -1
 	endif
-	if (strlen(s) == 0)
-		Print filename + ": V/LSB invalid"
+	headerData += "dataOffset:" + num2str(offs) + ";"
+	
+	Variable rampSize = Header_GetRampSize(fullheader, subGroupTitles, index)
+	if (rampSize <= 0)
+		Print filename + ": Deflection Error: Ramp Size invalid"
 		return -1
 	endif
-	headerData += "VPerLSB:" + s + ";"
+	headerData += "rampSize:" + num2str(rampSize) + ";"
+	
+	Variable springConst = Header_GetSpringConst(fullheader, subGroupTitles, index)
+	if (springConst <= 0)
+		Print filename + ": Deflection Error: Spring Constant invalid"
+		return -1
+	endif
+	headerData += "springConst:" + num2str(springConst) + ";"
+	
+	Variable VPerLSB = Header_GetLSBScale(fullheader, subGroupTitles, index)
+	if (springConst <= 0)
+		Print filename + ": Deflection Error: V/LSB scale invalid"
+		return -1
+	endif
+	headerData += "VPerLSB:" + num2str(VPerLSB) + ";"
+	
+	Variable sens = Header_GetSens(fullheader, subGroupTitles, "DeflSens")
+	if (sens <= 0)
+		Print filename + ": Deflection Error: Deflection sensitivity invalid"
+		return -1
+	endif
+	headerData += "deflSens:" + num2str(sens) + ";"
+	
+	
+	// Z sensor channel
+	index = Header_FindDataType(fullheader, subGroupTitles, "ZSensor")
+	if (index < 0)
+		Print filename + ": Didn't find ZSensor data"
+		return -1
+	endif
+	
+	offs = Header_GetDataOffset(fullheader, subGroupTitles, index)
+	if (offs <= 0)
+		Print filename + ": ZSensor: Data offset invalid"
+		return -1
+	endif
+	headerData += "ZdataOffset:" + num2str(offs) + ";"
+	
+	VPerLSB = Header_GetLSBScale(fullheader, subGroupTitles, index)
+	if (springConst <= 0)
+		Print filename + ": ZSensor: V/LSB scale invalid"
+		return -1
+	endif
+	headerData += "ZVPerLSB:" + num2str(VPerLSB) + ";"
+	
+	sens = Header_GetSens(fullheader, subGroupTitles, "ZsensSens")
+	if (sens <= 0)
+		Print filename + ": ZSensor: Deflection sensitivity invalid"
+		return -1
+	endif
+	headerData += "ZSens:" + num2str(sens) + ";"
+	
+	return 0
+End
 
-	// Get Z piezo sensitivity in nm/V
-	FindValue/TEXT="\\*Scanner list"/TXOP=4 subGroupTitles
-	if (V_value < 0)
-		Print filename + ": \\*Scanner list not found"
-		return -1
-	endif
-	subGroupOffset = W_Index[V_value]
-	
-	FindValue/S=(subGroupOffset)/TEXT="\\@Sens. Zsens:" fullHeader
-	if (V_value < 0)
-		Print filename + ": Z piezo sens. not found"
-		return -1
-	endif
-	SplitString/E=":\\sV\\s(.+)\\snm/V$" fullHeader[V_value], s
-	if (strlen(s) == 0)
-		Print filename + ": Z piezo sens. invalid"
-		return -1
-	endif
-	// Calculate ramp size in nm
-	headerData += "rampSize:" + num2str(str2num(s)*rampSizeV) + ";"
-	
-	// Get deflection sensitivity in nm/V
-	FindValue/TEXT="\\*Ciao scan list"/TXOP=4 subGroupTitles
-	if (V_value < 0)
-		Print filename + ": \\*Ciao scan list not found"
-		return -1
-	endif
-	subGroupOffset = W_Index[V_value]
-	
-	FindValue/S=(subGroupOffset)/TEXT="\\@Sens. DeflSens:" fullHeader
-	if (V_value < 0)
-		Print filename + ": Defl. sens. not found"
-		return -1
-	endif
-	SplitString/E=":\\sV\\s(.+)\\snm/V$" fullHeader[V_value], s
-	if (strlen(s) == 0)
-		Print filename + ": Defl. sens. invalid"
-		return -1
-	endif
-	headerData += "deflSens:" + s + ";"
 
-	return 0	
+// Read and parse FC file given by fileName
+// Write relevant info about FC into String headerData (pass by ref)
+// Return 0 if no errors, -1 otherwise
+//
+// headerData is in "key1:value1;key2:value2;" format
+// keys:
+// dataOffset		Byte offset to binary data start
+// rampSize			Z piezo ramp size in nm
+// VPerLSB			Vertical deflection V/LSB
+// deflSens			Deflection sensitivity nm/V
+// springConst		Spring constant nN/nm
+Function ParseFVHeader(fileName, headerwave, titleswave, headerData)
+	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
+	String headerwave		// Name of the text wave where full header will be saved to (will be overwritten)
+	String titleswave		// Name of the text wave where the section titles will be written to (will be overwritten)
+	String &headerData		// Pass-by-ref string will be filled with header data
+	
+	Variable result, subGroupOffset
+	headerData = ""
+	
+	
+	result = ReadHeaderLines(fileName, headerwave)
+	if (result != 0)
+		Print fileName + ": Did not find header end"
+		return -1
+	endif
+	
+	result = GetHeaderSectionTitles(headerwave, titleswave)
+	if (result != 0)
+		print fileName + ": Could not extract sections from header"
+		return -1
+	endif
+	
+	WAVE/T fullHeader = $headerwave
+	WAVE/T subGroupTitles = $titleswave
+	WAVE W_Index
+	
+	// ============================
+	// Extract relevant header data
+	// ============================
+	
+	String version = Header_GetVersion(fullheader, subGroupTitles)
+	
+	if (cmpstr(version, "") == 0)
+		Print filename + ": Version info not found"
+		return -1
+	endif
+	if (WhichListItem(version, ksVersionReq, ",") < 0)
+		Print filename + ": File version not supported"
+		return -1
+	endif
+	
+	String filetype = Header_GetFiletype(fullheader, subGroupTitles)
+	if (cmpstr(filetype, ksFileTypeFV) != 0)
+		Print filename + ": Wrong file type"
+		return -1
+	endif
+	
+	Variable fcpoints = Header_GetNumPoints(fullheader, subGroupTitles)
+	if (fcpoints != ksFCPoints)
+		Print filename + ": Wrong number of data points per curve"
+		return -1
+	endif
+	
+	// Deflection Error channel
+	Variable index = Header_FindDataType(fullheader, subGroupTitles, "DeflectionError")
+	if (index < 0)
+		Print filename + ": Didn't find Deflection Error data"
+		return -1
+	endif
+	
+	Variable offs = Header_GetDataOffset(fullheader, subGroupTitles, index)
+	if (offs <= 0)
+		Print filename + ": Deflection Error: Data offset invalid"
+		return -1
+	endif
+	headerData += "dataOffset:" + num2str(offs) + ";"
+	
+	Variable rampSize = Header_GetRampSize(fullheader, subGroupTitles, index)
+	if (rampSize <= 0)
+		Print filename + ": Deflection Error: Ramp size invalid"
+		return -1
+	endif
+	headerData += "rampSize:" + num2str(rampSize) + ";"
+	
+	Variable springConst = Header_GetSpringConst(fullheader, subGroupTitles, index)
+	if (springConst <= 0)
+		Print filename + ": Deflection Error: Spring constant invalid"
+		return -1
+	endif
+	headerData += "springConst:" + num2str(springConst) + ";"
+	
+	Variable VPerLSB = Header_GetLSBScale(fullheader, subGroupTitles, index)
+	if (springConst <= 0)
+		Print filename + ": Deflection Error: V/LSB scale invalid"
+		return -1
+	endif
+	headerData += "VPerLSB:" + num2str(VPerLSB) + ";"
+	
+	Variable sens = Header_GetSens(fullheader, subGroupTitles, "DeflSens")
+	if (sens <= 0)
+		Print filename + ": Deflection Error: Deflection sensitivity invalid"
+		return -1
+	endif
+	headerData += "deflSens:" + num2str(sens) + ";"
+	
+	return 0
 End
 
 
