@@ -1,7 +1,5 @@
-#pragma rtGlobals=1		// Use modern global access method.
+#pragma rtGlobals=3		// Use modern global access method.
 //#pragma IndependentModule=ForceMapAnalysis  // disabled for easier debugging etc
-#include <SaveGraph>
-#include <Wave Loading>
 
 #include ":analysis-code"		// Analysis
 #include ":plotting-code"		// PlotFC

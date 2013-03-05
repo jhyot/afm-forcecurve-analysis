@@ -1,4 +1,4 @@
-#pragma rtGlobals=1		// Use modern global access method.
+#pragma rtGlobals=3		// Use modern global access method.
 
 
 Function Analysis()
@@ -21,6 +21,7 @@ Function Analysis()
 	WAVE sel=$selectionwave
 
 	WAVE/T fcmeta
+	WAVE fc
 	String header
 	Variable num = 0
 	
