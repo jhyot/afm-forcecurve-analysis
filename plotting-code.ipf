@@ -268,6 +268,7 @@ Function PlotFC_showcurves(cname) : ButtonControl
 					Button showapproach,title="Show approach",userdata="0"
 			else
 				// Show approach graph
+					WAVE fc, fc_x_tsd, fc_smth, fc_smth_xtsd
 					AppendToGraph fc[][index] vs fc_x_tsd[][index]
 					AppendToGraph fc_smth[][index] vs fc_smth_xtsd[][index]
 					
@@ -286,6 +287,7 @@ Function PlotFC_showcurves(cname) : ButtonControl
 					Button showretract,title="Show retract",userdata="0"
 			else
 				// Show retract graph
+					WAVE rfc, rfc_x_tsd
 					AppendToGraph rfc[][index] vs rfc_x_tsd[][index]
 					
 					trace = ItemsInList(TraceNameList("", ";", 1)) - 1
