@@ -79,7 +79,6 @@ Function Analysis()
 	params = ReplaceNumberByKey("ksBrushOverNoise", params, ksBrushOverNoise)
 	params = ReplaceNumberByKey("ksHardwallFitFraction", params, ksHardwallFitFraction)
 	
-	
 	// Create 2d waves for Analysis
 	Make/N=(ksFCPoints, totalWaves)/O fc_blfit = NaN
 	Make/N=(ksFCPoints/8, totalWaves)/O fc_sensfit = NaN
@@ -119,7 +118,7 @@ Function Analysis()
 			SetScale/I x 0, (rampSize/8), "nm", fc_sensfit
 			SetScale/I x 0, (rampSize), "nm", fc_expfit
 		
-			result = AnalyseBrushHeight3(i, brushheight_names, brushheights)
+			result = AnalyseBrushHeight3(i, brushheights)
 			if(result < 0)
 				//could not determine brush height
 				heightsmap[i] = -100
@@ -174,9 +173,8 @@ End
 //
 // NOTE: A lot of parameters/assumptions are hardcoded here for brush extend FC curves with 4096 points
 // (todo: change this in future)
-Function AnalyseBrushHeight1(index, wNames, wHeights)
+Function AnalyseBrushHeight1(index, wHeights)
 	Variable index
-	WAVE/T wNames
 	WAVE wHeights
 	
 	Variable V_fitOptions = 4		// suppress CurveFit progress window
@@ -184,9 +182,6 @@ Function AnalyseBrushHeight1(index, wNames, wHeights)
 	WAVE/T fcmeta
 	
 	String header = fcmeta[index]
-	
-	wNames[index][0] = "fc" + num2str(index)
-	wNames[index][1] = StringByKey("fileName", header)
 	
 	WAVE fc
 	WAVE fc_blfit, fc_sensfit, fc_x_tsd, fc_expfit
@@ -337,9 +332,8 @@ End
 // * new defl sens fitting in hardwall part
 // * start point for exp fit from hardwall end
 // * use constant ksBrushCutoff to get brush height
-Function AnalyseBrushHeight2(index, wNames, wHeights)
+Function AnalyseBrushHeight2(index, wHeights)
 	Variable index
-	WAVE/T wNames
 	WAVE wHeights
 	
 	Variable V_fitOptions = 4		// suppress CurveFit progress window
@@ -347,9 +341,6 @@ Function AnalyseBrushHeight2(index, wNames, wHeights)
 	WAVE/T fcmeta
 	
 	String header = fcmeta[index]
-	
-	wNames[index][0] = "fc" + num2str(index)
-	wNames[index][1] = StringByKey("fileName", header)
 	
 	WAVE fc
 	WAVE fc_blfit, fc_sensfit, fc_x_tsd, fc_expfit
@@ -500,9 +491,8 @@ End
 // Test of different brush height algorithm
 // Changes from original AnalyseBrushHeight2:
 // * Brush height from filtered curve directly instead of expfit
-Function AnalyseBrushHeight3(index, wNames, wHeights)
+Function AnalyseBrushHeight3(index, wHeights)
 	Variable index
-	WAVE/T wNames
 	WAVE wHeights
 	
 	Variable V_fitOptions = 4		// suppress CurveFit progress window
@@ -510,9 +500,6 @@ Function AnalyseBrushHeight3(index, wNames, wHeights)
 	WAVE/T fcmeta
 	
 	String header = fcmeta[index]
-	
-	wNames[index][0] = "fc" + num2str(index)
-	wNames[index][1] = StringByKey("fileName", header)
 	
 	WAVE fc
 	WAVE fc_blfit, fc_sensfit, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
