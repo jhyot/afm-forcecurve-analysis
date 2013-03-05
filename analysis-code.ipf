@@ -8,6 +8,20 @@ Function Analysis()
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
+	
+	String alert = ""
+	
+	NVAR/Z analysisDone = :internalvars:analysisDone
+	if (NVAR_Exists(analysisDone) && analysisDone == 1)
+		alert = "Analysis has been run already on this data.\r"
+		alert += "Re-running can lead to wrong results. Continue anyway?"
+		DoAlert 1, alert
+		
+		if (V_flag != 1)
+			print "Analysis canceled by user"
+			return -1
+		endif
+	endif
 
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable result=-1
@@ -48,9 +62,9 @@ Function Analysis()
 	endif
 	
 	if (conflict)
-		String a = "Some analysis parameters do not match previously used ones for this data set.\r"
-		a += "Continuing can lead to inconsistent results. Old parameters will be lost. Continue anyway?"
-		DoAlert 1, a
+		alert = "Some analysis parameters do not match previously used ones for this data set.\r"
+		alert += "Continuing can lead to inconsistent results. Old parameters will be lost. Continue anyway?"
+		DoAlert 1, alert
 		
 		if (V_flag != 1)
 			print "Analysis canceled by user"
@@ -85,6 +99,10 @@ Function Analysis()
 	Make/N=(totalWaves)/O heightsmap = NaN
 	Make/N=(totalWaves)/O deflsensfitted = NaN
 	Make/N=(totalWaves)/O blnoise = NaN
+	
+	// Running analysis changes the "raw" data (rescales it inplace)
+	// Set flag immediately before analysis starts to warn the user if he re-runs the analysis
+	Variable/G :internalvars:analysisDone = 1
 	
 	
 	for (i=0; i < totalWaves; i+=1)
