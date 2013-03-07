@@ -102,7 +102,7 @@ Function LoadandAnalyseAll()
 	SVAR totalpath = :internalvars:totalpath
 
 
-	ReadAllFCs(totalpath)
+	ReadFCsInFile(totalpath)
 
 
 	Analysis()
@@ -581,7 +581,7 @@ Function ChooseFVs_button(ctrl) : ButtonControl
 			// turn off the chooser hook
 			SetWindow $imagegraph,hook(choose)= $""
 			// kill the window AFTER this routine returns
-			ReadAllFCs(totalpath)
+				ReadFCsInFile(totalpath)
 			DoWindow/K Dialog
 			break
 		
@@ -637,14 +637,14 @@ End
 
 
 
-Function ReadAllFCs(fileName)
+Function ReadFCsInFile(fileName)
 	String fileName			// Igor-style path: e.g. "X:Code:igor-analyse-forcecurves:test-files:pegylated_glass.004"
 	
 	Variable result
 	Variable index=0
 	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
-	String/G fvmeta
+	SVAR fvmeta
 	SVAR selectionwave = :internalvars:selectionwave
 	SVAR imagegraph = :internalvars:imagegraph
 
