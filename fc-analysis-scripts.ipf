@@ -118,12 +118,8 @@ End
 // Also sets global variable isMapLoaded to 1.
 Function LoadForceMap()
 
-	String df = GetDataFolder(0)
-	if (cmpstr(df, "root") == 0)
-		DoAlert 1, "You are in root data folder, this is not recommended.\rContinue anyway?"
-		if (V_flag == 2)
-			return -1
-		endif
+	if (CheckRoot() < 0)
+		return -1
 	endif
 
 	NewDataFolder/O internalvars
@@ -2155,6 +2151,19 @@ Function PrintInfoDF(df)
 	SetDataFolder fulldf
 	PrintInfo()
 	SetDataFolder prevDF
+End
+
+
+Function CheckRoot()
+	String df = GetDataFolder(0)
+	if (cmpstr(df, "root") == 0)
+		DoAlert 1, "You are in root data folder, this is not recommended.\rContinue anyway?"
+		if (V_flag == 2)
+			return -1
+		endif
+	endif
+	
+	return 0
 End
 
 
