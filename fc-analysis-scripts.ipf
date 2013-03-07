@@ -375,8 +375,25 @@ Function ReadMap(fileName)
 End
 
 
-Function ReadMapSingleFCs(path)
+Function LoadSingleFCFolder(path)
 	String path				// Path string to folder with FCs
+	
+	if (CheckRoot() < 0)
+		return -1
+	endif
+	
+	NewDataFolder/O internalvars
+	
+	Variable/G :internalvars:isMapLoaded = 0
+	NVAR isMapLoaded = :internalvars:isMapLoaded
+	
+	if (WaveExists($"fcmeta"))
+		DoAlert 1, "Other force data detected in current data folder\rContinuing will overwrite old waves, OK?"
+		if (V_flag == 2)
+			return -1
+		endif
+	endif
+	
 	
 	if (strlen(path)==0)				// If no path specified, create one
 		NewPath/O/Q tempFCpath			// This will put up a dialog
@@ -386,6 +403,10 @@ Function ReadMapSingleFCs(path)
 	else
 		NewPath/O/Q tempFCpath, path
 	endif
+	
+	PathInfo tempFCpath
+	String/G :internalvars:totalpath = S_path
+	SVAR pathstr = :internalvars:totalpath
 	
 	String filename = ""
 	Make/T/FREE/N=0 filenames = ""
@@ -412,8 +433,6 @@ Function ReadMapSingleFCs(path)
 	
 	Variable result = -1
 	n = numpnts(filenames)
-	PathInfo tempFCpath
-	String pathstr = S_path
 	
 	Make/O/T/N=0 fcmeta = ""
 	WAVE/T fcmeta
@@ -427,6 +446,8 @@ Function ReadMapSingleFCs(path)
 	String headerData = ""
 	
 	for (i=0; i < n; i+=1)
+		Prog("ReadSingleFCs", i+1, n)
+		
 		fullFilename = pathstr + filenames[i]
 		headerData = ""
 		result = ParseFCHeader(fullFilename, "fullheader", "subGroupTitles", headerData)
@@ -443,12 +464,46 @@ Function ReadMapSingleFCs(path)
 		
 		Redimension/N=(numread+1) fc_z
 		fc_z[numread] = GetZPos(numread)
+		if (numtype(fc_z[numread]) == 2)
+			print fullFilename + ": couldn't extract Z position"
+		endif
 		
-		numread += 1
-		print fullFilename + ": ok"
+		numread += 1		
 	endfor
 	
-	print num2str(numread) + " files read successfully"
+	print pathstr + " "  + num2str(numread) + " files loaded successfully into " + TidyDFName(GetDataFolder(1))
+	
+	// probably height data not yet correctly read out and "calibrated"
+	// for now just transform it so that the overall topography looks ok
+	WaveStats/Q fc_z
+	fc_z -= V_max
+	fc_z *= -1
+	
+	String datatypelst = "line;box;random"
+	String datatype = "line"
+	Prompt datatype, "Type", popup, datatypelst
+	DoPrompt "How were the curves recorded?", datatype
+	
+	if (V_flag == 1)
+		// user cancelled
+		datatype = "cancel"
+	endif
+	
+	strswitch (datatype)
+		case "line":
+			result = CreateLineSingleFCs()
+			break
+		case "box":
+			result = CreateMapSingleFCs()
+			ShowImage()
+			isMapLoaded = 1
+			break
+		case "random":
+			// Do nothing further
+			break
+	endswitch
+	
+	Variable/G :internalvars:singleFCs = 1
 	
 	if (Exists("tempFCpath"))
 		KillPath tempFCpath
@@ -494,12 +549,104 @@ Function GetZPos(index)
 	return zval
 End
 
+
+Function CreateLineSingleFCs()
+	
+	WAVE/T fcmeta
+	
+	Variable num = numpnts(fcmeta)
+	
+	Make/N=(num)/O fc_x = NaN, fc_y = NaN
+	WAVE fc_x, fc_y, fc_z
+	
+	Variable i = 0	
+	for (i=0; i < num; i+=1)
+		fc_x[i] = NumberByKey("xpos", fcmeta[i])
+		fc_y[i] = NumberByKey("ypos", fcmeta[i])
+	endfor
+	
+	Make/N=(num)/O fc_zx = 0
+	Variable xdist = 0, ydist = 0
+	for (i=1; i < num; i+=1)
+		xdist = fc_x[i] - fc_x[i-1]
+		ydist = fc_y[i] - fc_y[i-1]
+		fc_zx[i] = sqrt(xdist*xdist + ydist*ydist)
+	endfor
+	
+	return 0
+End
+
+
+Function CreateMapSingleFCs()
+	
+	WAVE/T fcmeta
+	
+	Variable num = numpnts(fcmeta)
+	
+	Make/N=(num)/O fc_x = NaN, fc_y = NaN
+	WAVE fc_x, fc_y, fc_z
+	
+	Variable i = 0	
+	for (i=0; i < num; i+=1)
+		fc_x[i] = NumberByKey("xpos", fcmeta[i])
+		fc_y[i] = NumberByKey("ypos", fcmeta[i])
+	endfor
+	
+	Variable dimnum = ceil(sqrt(num))	// number in 1 dimension (1 side)
+	
+	Duplicate/O/FREE fc_x, fc_xround
+	Duplicate/O/FREE fc_y, fc_yround
+
+	WaveStats/Q fc_x
+	Variable dimdeltax = (V_max - V_min) / (dimnum-1)
+	fc_xround -= V_min
+	
+	WaveStats/Q fc_y
+	Variable dimdeltay = (V_max - V_min) / (dimnum-1)
+	fc_yround -= V_min
+	
+	Make/N=(dimnum, dimnum)/O imagefc = 0, imagefccount = 0
+	Make/N=(dimnum, dimnum)/O/FREE imagepxtonum = 0
+	Duplicate/O/FREE fc_z, fc_znum
+	fc_znum = p
+	
+	// Work with integers ("pixel numbers") for image creation, otherwise rounding errors may cause unexpected behaviour
+	// (incorrectly assigned pixels)
+	fc_xround = round(fc_xround[p] / dimdeltax)
+	fc_yround = round(fc_yround[p] / dimdeltay)
+	SetScale/P x, 0, 1, "", imagefc, imagepxtonum
+	SetScale/P y, 0, 1, "", imagefc, imagepxtonum
+	
+	ImageFromXYZ {fc_xround, fc_yround, fc_znum}, imagepxtonum, imagefccount
+	Redimension/N=(numpnts(imagepxtonum)) imagepxtonum
+	Sort imagepxtonum, fcmeta, fc_x, fc_y, fc_z, fc_xround, fc_yround
+	
+	imagefccount = 0
+	ImageFromXYZ {fc_xround, fc_yround, fc_z}, imagefc, imagefccount
+	
+	WaveStats/Q imagefccount
+	if (V_min != 1 || V_max != 1 || V_sum != num)
+		print "WARNING: data not evenly assigned to pixels in image"
+	endif
+	
+	Make/O/N=(ksFCPoints, num) fc=NaN, rfc=NaN	
+	String/G :internalvars:imagewave = "imagefc"
+	
+	return 0
+End
+
+
 Function ChooseForceCurves()
 
 	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
 	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
+	endif
+	
+	NVAR/Z singlefc = :internalvars:singleFCs
+	if (!NVAR_Exists(singlefc))
+		Variable/G :internalvars:singleFCs = 0
 	endif
 	
 	SVAR totalpath = :internalvars:totalpath
@@ -570,24 +717,35 @@ End
 Function ChooseFVs_button(ctrl) : ButtonControl
 	String ctrl
 	
+	NVAR singlefc = :internalvars:singleFCs
+	
 	strswitch (ctrl)
 		case "done":
-			SVAR totalpath = :internalvars:totalpath
-			SVAR imagegraph = :internalvars:imagegraph
 			// turn off the chooser hook
+			SVAR imagegraph = :internalvars:imagegraph
 			SetWindow $imagegraph,hook(choose)= $""
-			// kill the window AFTER this routine returns
+			if (singlefc == 1)
+				ReadFCsInFolder()
+			else
+				SVAR totalpath = :internalvars:totalpath
 				ReadFCsInFile(totalpath)
+			endif
+			
 			DoWindow/K Dialog
 			break
 		
 		case "sall":
-			String/G fvmeta
 			SVAR selectionwave = :internalvars:selectionwave
 			WAVE sel=$selectionwave
 			Variable i
 			for(i=0;i<(ksFVRowsize*ksFVRowSize);i+=1)
-				sel[i]=NumberByKey("dataOffset", fvmeta)+ksFCPoints*2*2*i
+				if (singlefc == 1)
+					WAVE/T fcmeta
+					sel[i] = NumberByKey("dataOffset", fcmeta[i])
+				else
+					SVAR fvmeta
+					sel[i] = NumberByKey("dataOffset", fvmeta)+ksFCPoints*2*2*i
+				endif
 			endfor	
 			break
 	endswitch
@@ -600,8 +758,8 @@ Function chooser(s)
 	STRUCT WMWinHookStruct &s
 	Variable rval = 0
 	SVAR selectionwave = :internalvars:selectionwave
-	String/G fvmeta
 	SVAR imagegraph = :internalvars:imagegraph
+	NVAR singlefc = :internalvars:singleFCs
 
 	// React only on left mousedown
 	if ((s.eventCode == 3) && (s.eventMod & 1 != 0))
@@ -611,16 +769,19 @@ Function chooser(s)
 		// Get image pixel and force curve number
 		Variable pixelY = round(AxisValFromPixel(imagegraph, "left", mouseY-s.winrect.top))
 		Variable pixelX = round(AxisValFromPixel(imagegraph, "bottom", mouseX-s.winrect.left))
-		Variable fcnum = pixelX+(pixelY*ksFVRowSize)
 
 		if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1))
 			DrawPointMarker(imagegraph, pixelX, pixelY, 0)
-			
 			// Write selected fc offset to selection wave
-			Variable offs = NumberByKey("dataOffset", fvmeta)+ksFCPoints*2*fcnum*2
 			WAVE sel=$selectionwave
-			
-			sel[fcnum] = offs
+			Variable fcnum = pixelX+(pixelY*ksFVRowSize)
+			if (singlefc == 1)
+				WAVE/T fcmeta
+				sel[fcnum] = NumberByKey("dataOffset", fcmeta[fcnum])
+			else
+				SVAR fvmeta
+				sel[fcnum] = NumberByKey("dataOffset", fvmeta)+ksFCPoints*2*fcnum*2
+			endif
 			print "X: " + num2str(pixelX) + "; Y: " + num2str(pixelY) + "; FC: ", num2str(fcnum)
 		endif
 
@@ -631,6 +792,69 @@ Function chooser(s)
 
 End
 
+
+Function ReadFCsInFolder()
+
+	Variable result
+	Variable totalWaves=ksFVRowSize*ksFVRowSize
+	Variable success=0
+	SVAR selectionwave = :internalvars:selectionwave
+	SVAR imagegraph = :internalvars:imagegraph
+
+	
+	DoWindow/F $imagegraph	// Bring graph to front
+	if (V_Flag == 0)			// Verify that graph exists
+		Print "No image graph found"
+		return -1
+	endif
+	
+	variable t0=ticks
+	
+	WAVE dataOffsets=$selectionwave
+	WAVE fc, rfc
+	WAVE/T fcmeta
+	String fileName = ""
+	
+	// read selected FCs into 2d wave (1 curve per column, leave empty columns if wave not selected)
+	Variable i=0
+	for (i=0; i < totalWaves; i+=1)						
+		if(dataOffsets[i])
+			fileName = StringByKey("filename", fcmeta[i])
+			GBLoadWave/N=fcload/B/Q/S=(dataOffsets[i])/T={16,4}/U=(ksFCPoints)/W=2 fileName
+			
+			if (V_flag == 2)
+				WAVE fcloaded = $(StringFromList(0, S_waveNames))
+				WAVE rfcloaded = $(StringFromList(1, S_waveNames))
+				
+				fc[][i] = fcloaded[p]
+				rfc[][i] = rfcloaded[p]
+				
+				// Increment number of successfully read files
+				success += 1
+			else
+				Print "Did not find approach + retract curves at index " + num2str(i)
+			endif
+		endif
+
+		Prog("ReadWaves",i,totalWaves)
+		
+	endfor
+	
+	printf "Elapsed time: %g seconds\r",round(10*(ticks-t0)/60)/10
+
+	// Create 2 waves
+	// One holds file and wave names, the other the corresponding brush heights
+	// Value will be filled in AnalyseBrushHeight
+	// Old waves will be overwritten
+	// (same for retractfeature)
+	Make/T/O/N=(totalWaves, 2) brushheight_names = {"", ""}
+	Make/O/N=(totalWaves) brushheights = NaN
+	Make/O/N=(totalWaves) retractfeature = NaN
+	
+	KillWaves/Z fcload0, fcload1
+
+	return success
+End
 
 
 Function ReadFCsInFile(fileName)
