@@ -685,6 +685,19 @@ Function ReadForceCurves()
 	NVAR numcurves = :internalvars:numCurves
 	NVAR rowsize = :internalvars:FVRowSize
 	
+	Variable i = 0
+	
+	if (singlefc && (rowsize == 0))
+		// If single FC data source, and now row size defined (i.e. not a box), load all curves
+		Make/O/N=(numcurves) $selectionwave = NaN
+		WAVE selsingle=$selectionwave
+		WAVE/T fcmeta
+		for(i=0; i < numcurves; i+=1)
+			selsingle[i] = NumberByKey("dataOffset", fcmeta[i])
+		endfor
+		ReadFCsInFolder()
+		return 0
+	endif
 	
 	Variable del = 1
 	WAVE/Z sel = $selectionwave
@@ -712,7 +725,6 @@ Function ReadForceCurves()
 	else
 		// Redraw markers on graph if exists
 		if (V_flag > 0)
-			Variable i
 			for (i=0; i < numcurves; i+=1)
 				if (sel[i] > 0)
 					// was previously selected

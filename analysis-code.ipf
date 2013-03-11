@@ -159,20 +159,25 @@ Function Analysis()
 	print "brushheights:"
 	WaveStats brushheights
 	
-	
-	String/G :internalvars:resultwave = "heightsmap"
-	
-	ShowResultMap()
-	
-	SVAR resultgraph = :internalvars:resultgraph
-	SVAR imagegraph = :internalvars:imagegraph
+	NVAR singlefc = :internalvars:singleFCs
 		
-	SetWindow $resultgraph,hook(resultinspect)=inspector
-	SetWindow $imagegraph,hook(imageinspect)=inspector
-
-	return 0
-
+	if (singlefc && (rowsize == 0))
+		return 0
+	else
 		Redimension/N=(rowsize,rowsize) heightsmap
+		
+		String/G :internalvars:resultwave = "heightsmap"
+		
+		ShowResultMap()
+		
+		SVAR resultgraph = :internalvars:resultgraph
+		SVAR imagegraph = :internalvars:imagegraph
+			
+		SetWindow $resultgraph,hook(resultinspect)=inspector
+		SetWindow $imagegraph,hook(imageinspect)=inspector
+		
+		return 0
+	endif
 End
 
 
