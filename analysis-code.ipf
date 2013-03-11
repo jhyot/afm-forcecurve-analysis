@@ -3,16 +3,15 @@
 
 Function Analysis()
 
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
-	
-	String alert = ""
-	
+		
 	NVAR/Z analysisDone = :internalvars:analysisDone
 	if (NVAR_Exists(analysisDone) && analysisDone == 1)
+		String alert = ""
 		alert = "Analysis has been run already on this data.\r"
 		alert += "Re-running can lead to wrong results. Continue anyway?"
 		DoAlert 1, alert
@@ -23,7 +22,7 @@ Function Analysis()
 		endif
 	endif
 
-	Variable totalWaves=ksFVRowSize*ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 	Variable result=-1
 	
 	Variable i, t0=ticks
@@ -41,11 +40,12 @@ Function Analysis()
 	
 	// Save analysis parameters, or compare if already saved
 	SVAR/Z params = :internalvars:analysisparameters
+	NVAR rowsize = :internalvars:FVRowSize
 	Variable conflict = 0
 	if (SVAR_Exists(params))
 		if (ksFCPoints != NumberByKey("ksFCPoints", params))
 			conflict = 1
-		elseif (ksFVRowSize != NumberByKey("ksFVRowSize", params))
+		elseif (rowsize != NumberByKey("FVRowSize", params))
 			conflict = 1
 		elseif (ksBaselineFitLength != NumberByKey("ksBaselineFitLength", params))
 			conflict = 1
@@ -73,21 +73,21 @@ Function Analysis()
 	endif
 	
 	params = ReplaceNumberByKey("ksFCPoints", params, ksFCPoints)
-	params = ReplaceNumberByKey("ksFVRowSize", params, ksFVRowSize)
+	params = ReplaceNumberByKey("FVRowSize", params, rowsize)
 	params = ReplaceNumberByKey("ksBaselineFitLength", params, ksBaselineFitLength)
 	params = ReplaceNumberByKey("ksBrushCutoff", params, ksBrushCutoff)
 	params = ReplaceNumberByKey("ksBrushOverNoise", params, ksBrushOverNoise)
 	params = ReplaceNumberByKey("ksHardwallFitFraction", params, ksHardwallFitFraction)
 	
 	// Create 2d waves for Analysis
-	Make/N=(ksFCPoints, totalWaves)/O fc_blfit = NaN
-	Make/N=(ksFCPoints/8, totalWaves)/O fc_sensfit = NaN
-	Make/N=(ksFCPoints, totalWaves)/O fc_x_tsd = NaN
-	Make/N=(ksFCPoints, totalWaves)/O fc_expfit = NaN
-	Make/N=(ksFCPoints, totalWaves)/O fc_smth = NaN
-	Make/N=(ksFCPoints, totalWaves)/O fc_smth_xtsd = NaN
+	Make/N=(ksFCPoints, numcurves)/O fc_blfit = NaN
+	Make/N=(ksFCPoints/8, numcurves)/O fc_sensfit = NaN
+	Make/N=(ksFCPoints, numcurves)/O fc_x_tsd = NaN
+	Make/N=(ksFCPoints, numcurves)/O fc_expfit = NaN
+	Make/N=(ksFCPoints, numcurves)/O fc_smth = NaN
+	Make/N=(ksFCPoints, numcurves)/O fc_smth_xtsd = NaN
 	
-	Make/N=(ksFCPoints, totalWaves)/O rfc_x_tsd = NaN
+	Make/N=(ksFCPoints, numcurves)/O rfc_x_tsd = NaN
 	
 	
 	// brushheights: 1D wave to hold analysed brush heights and NaN if not analysed
@@ -95,16 +95,16 @@ Function Analysis()
 	// deflsensfitted: 1D wave to hold fitted deflection sensitivities
 	// blnoise: 1D wave to hold calculated baseline noise
 	WAVE brushheights
-	Make/N=(totalWaves)/O heightsmap = NaN
-	Make/N=(totalWaves)/O deflsensfitted = NaN
-	Make/N=(totalWaves)/O blnoise = NaN
+	Make/N=(numcurves)/O heightsmap = NaN
+	Make/N=(numcurves)/O deflsensfitted = NaN
+	Make/N=(numcurves)/O blnoise = NaN
 	
 	// Running analysis changes the "raw" data (rescales it inplace)
 	// Set flag immediately before analysis starts to warn the user if he re-runs the analysis
 	Variable/G :internalvars:analysisDone = 1
 	
 	
-	for (i=0; i < totalWaves; i+=1)
+	for (i=0; i < numcurves; i+=1)
 	
 		if(sel[i])
 		
@@ -140,7 +140,7 @@ Function Analysis()
 			num += 1
 		endif
 		
-		Prog("Analysis",i,totalWaves)
+		Prog("Analysis",i,numcurves)
 		
 	endfor
 
@@ -150,7 +150,6 @@ Function Analysis()
 	print "brushheights:"
 	WaveStats brushheights
 	
-	Redimension/N=(ksFVRowSize,ksFVRowSize) heightsmap
 	
 	String/G :internalvars:resultwave = "heightsmap"
 	
@@ -164,6 +163,7 @@ Function Analysis()
 
 	return 0
 
+		Redimension/N=(rowsize,rowsize) heightsmap
 End
 
 
@@ -694,7 +694,7 @@ End
 Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	Variable index, rampSize, VPerLSB, springConst
 	
-	Variable totalWaves = ksFVRowSize*ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 
 	Variable/G V_fitoptions=4 //no fit window
 
@@ -706,13 +706,13 @@ Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	WAVE rw=$wname
 
 	
-	make/N=(totalWaves)/O timer1
+	make/N=(numcurves)/O timer1
 	Variable tic1
-	make/N=(totalWaves)/O timer2
+	make/N=(numcurves)/O timer2
 	Variable tic2
-	make/N=(totalWaves)/O timer3
+	make/N=(numcurves)/O timer3
 	Variable tic3
-	make/N=(totalWaves)/O timer4
+	make/N=(numcurves)/O timer4
 	Variable tic4
 	
 	

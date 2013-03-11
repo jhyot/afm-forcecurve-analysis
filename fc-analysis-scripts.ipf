@@ -97,13 +97,14 @@ Function LoadandAnalyseAll()
 	String/G fvmeta
 	String/G :internalvars:selectionwave = "selectedcurves"
 	SVAR selectionwave = :internalvars:selectionwave
+	NVAR numcurves = :internalvars:numCurves
 
-	Make/O/N=(ksFVRowSize*ksFVRowsize) $selectionwave = NaN
+	Make/O/N=(numcurves) $selectionwave = NaN
 
 
 	Wave sel=$selectionwave
 
-	for(i=0;i<(ksFVRowSize*ksFVRowSize);i+=1)
+	for(i=0;i<(numcurves);i+=1)
 		sel[i] = NumberByKey("dataOffset", fvmeta) + ksFCPoints*2*2*i
 	endfor
 
@@ -123,7 +124,7 @@ End
 // Saves filename to global string variable.
 //
 // Returns 0 if map loaded correctly, -1 otherwise.
-// Also sets global variable isMapLoaded to 1.
+// Also sets global variable isDataLoaded to 1.
 Function LoadForceMap()
 
 	if (CheckRoot() < 0)
@@ -132,8 +133,8 @@ Function LoadForceMap()
 
 	NewDataFolder/O internalvars
 	
-	Variable/G :internalvars:isMapLoaded = 0
-	NVAR isMapLoaded = :internalvars:isMapLoaded
+	Variable/G :internalvars:isDataLoaded = 0
+	NVAR isDataLoaded = :internalvars:isDataLoaded
 
 	Variable result = 0
 	Variable fileref = 0
@@ -152,6 +153,9 @@ Function LoadForceMap()
 		return -1
 	endif
 	
+	Variable/G :internalvars:FVRowSize = ksFVRowSize
+	Variable/G :internalvars:numCurves = ksFVRowSize*ksFVRowSize
+	
 	String/G :internalvars:totalpath = S_fileName
 	SVAR totalpath = :internalvars:totalpath
 	
@@ -163,7 +167,7 @@ Function LoadForceMap()
 	endif
 	
 	print "Loaded file '" + totalpath + "' into " + TidyDFName(GetDataFolder(1))	
-	isMapLoaded = 1
+	isDataLoaded = 1
 	return 0
 	
 End
@@ -172,9 +176,9 @@ End
 
 Function LoadImage()
 	
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
 	
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -260,13 +264,16 @@ Function LoadImageFromFile(filename, index, header)
 	Variable index		// 0-based number of image in file to load
 	String header		// header with data for all images, format see below
 	
+	NVAR numcurves = :internalvars:numCurves
+	NVAR rowsize = :internalvars:FVRowSize
+	
 	//Offsets(a), lengths(b), bytes(c), scale(d) in header: "a0,b0,c0,d0;a1,b1,c1,d1;..."
 	Variable offset = str2num(StringFromList(0, StringFromList(index,header), ","))
 	Variable length = str2num(StringFromList(1, StringFromList(index,header), ","))
 	Variable bpp = str2num(StringFromList(2, StringFromList(index,header), ","))
 	Variable scale = str2num(StringFromList(3, StringFromList(index,header), ","))
 	
-	if (length/bpp != ksFVRowSize*ksFVRowSize)
+	if (length/bpp != numcurves)
 		print filename + ": Size does not match FV data for image " + num2str(index)
 		return -1
 	endif
@@ -282,10 +289,8 @@ Function LoadImageFromFile(filename, index, header)
 	SVAR imagewave = :internalvars:imagewave
 	
 	WAVE w = $imagewave
-	
 	w *= scale
-	
-	redimension/N=(ksFVRowSize,ksFVRowSize) $imagewave
+	redimension/N=(rowSize,rowSize) $imagewave
 	
 	String n = "filename:" + filename + ";offset:" + num2str(offset) + ";length:" + num2str(length)
 	n += ";bpp:" + num2str(bpp) + ";scaleNmPerLSB:" + num2str(scale) + ";"
@@ -342,9 +347,10 @@ End
 // Returns 0 if no errors, -1 otherwise
 Function ReadMap(fileName)
 	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
-
+	
+	NVAR numcurves = :internalvars:numCurves
+	
 	Variable result
-	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	String headerData
 	
 	// Read and parse FC file header
@@ -375,8 +381,8 @@ Function ReadMap(fileName)
 
 	// Create waves for holding the curves (2d array, 1 column per curve)
 	// and for metadata about each curve (1 row per curve)
-	Make/O/N=(ksFCPoints, totalWaves) fc=NaN, rfc=NaN
-	Make/T/O/N=(totalWaves) fcmeta=""
+	Make/O/N=(ksFCPoints, numcurves) fc=NaN, rfc=NaN
+	Make/T/O/N=(numcurves) fcmeta=""
 
 	ShowImage()
 
@@ -392,8 +398,8 @@ Function LoadSingleFCFolder(path)
 	
 	NewDataFolder/O internalvars
 	
-	Variable/G :internalvars:isMapLoaded = 0
-	NVAR isMapLoaded = :internalvars:isMapLoaded
+	Variable/G :internalvars:isDataLoaded = 0
+	NVAR isDataLoaded = :internalvars:isDataLoaded
 	
 	if (WaveExists($"fcmeta"))
 		DoAlert 1, "Other force data detected in current data folder\rContinuing will overwrite old waves, OK?"
@@ -479,7 +485,10 @@ Function LoadSingleFCFolder(path)
 		numread += 1		
 	endfor
 	
-	print pathstr + " "  + num2str(numread) + " files loaded successfully into " + TidyDFName(GetDataFolder(1))
+	Variable/G :internalvars:numCurves = numread
+	Variable/G :internalvars:FVRowsize = 0
+	
+	print pathstr + " "  + num2str(numread) + " files loaded into " + TidyDFName(GetDataFolder(1))
 	
 	// probably height data not yet correctly read out and "calibrated"
 	// for now just transform it so that the overall topography looks ok
@@ -500,14 +509,18 @@ Function LoadSingleFCFolder(path)
 	strswitch (datatype)
 		case "line":
 			result = CreateLineSingleFCs()
+			isDataLoaded = 1
 			break
 		case "box":
 			result = CreateMapSingleFCs()
 			ShowImage()
-			isMapLoaded = 1
+			isDataLoaded = 1
 			break
 		case "random":
 			// Do nothing further
+			isDataLoaded = 1
+			break
+		default:
 			break
 	endswitch
 	
@@ -562,7 +575,8 @@ Function CreateLineSingleFCs()
 	
 	WAVE/T fcmeta
 	
-	Variable num = numpnts(fcmeta)
+	NVAR num = :internalvars:numCurves
+	Variable/G :internalvars:FVRowsize = 0
 	
 	Make/N=(num)/O fc_x = NaN, fc_y = NaN
 	WAVE fc_x, fc_y, fc_z
@@ -589,7 +603,9 @@ Function CreateMapSingleFCs()
 	
 	WAVE/T fcmeta
 	
-	Variable num = numpnts(fcmeta)
+	NVAR num = :internalvars:numCurves
+	Variable/G :internalvars:FVRowsize = ceil(sqrt(num))
+	NVAR dimnum = :internalvars:FVRowsize
 	
 	Make/N=(num)/O fc_x = NaN, fc_y = NaN
 	WAVE fc_x, fc_y, fc_z
@@ -599,8 +615,6 @@ Function CreateMapSingleFCs()
 		fc_x[i] = NumberByKey("xpos", fcmeta[i])
 		fc_y[i] = NumberByKey("ypos", fcmeta[i])
 	endfor
-	
-	Variable dimnum = ceil(sqrt(num))	// number in 1 dimension (1 side)
 	
 	Duplicate/O/FREE fc_x, fc_xround
 	Duplicate/O/FREE fc_y, fc_yround
@@ -644,10 +658,10 @@ Function CreateMapSingleFCs()
 End
 
 
-Function ChooseForceCurves()
+Function ReadForceCurves()
 
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -661,11 +675,13 @@ Function ChooseForceCurves()
 	String/G :internalvars:selectionwave = "selectedcurves"
 	SVAR selectionwave = :internalvars:selectionwave
 	
-	Variable totalcurves = ksFVRowSize*ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
+	NVAR rowsize = :internalvars:FVRowSize
+	
 	
 	Variable del = 1
 	WAVE/Z sel = $selectionwave
-	if (WaveExists(sel) && (numpnts(sel) == totalcurves))
+	if (WaveExists(sel) && (numpnts(sel) == numcurves))
 		WaveStats/Q sel
 		if (V_npnts > 0)
 			// Some pixels were previously already selected. Keep?
@@ -685,44 +701,44 @@ Function ChooseForceCurves()
 	endif
 	
 	if (del == 1)
-		Make/N=(totalcurves)/O $selectionwave = NaN
+		Make/N=(numcurves)/O $selectionwave = NaN
 	else
 		// Redraw markers on graph if exists
 		if (V_flag > 0)
 			Variable i
-			for (i=0; i < totalcurves; i+=1)
+			for (i=0; i < numcurves; i+=1)
 				if (sel[i] > 0)
 					// was previously selected
-					Variable pixelX = mod(i,ksFVRowSize)
-					Variable pixelY = floor(i/ksFVRowSize)
+					Variable pixelX = mod(i,rowsize)
+					Variable pixelY = floor(i/rowsize)
 					DrawPointMarker(imagegraph, pixelX, pixelY, 0)
 				endif
 			endfor
 		endif
 	endif
 			
-	ChooseFVs()
+	ChooseCurvesOnMap()
 End
 
 
 
-Function ChooseFVs()
+Function ChooseCurvesOnMap()
 	SVAR imagegraph = :internalvars:imagegraph
 	PauseUpdate; Silent 1		// building window...
 	NewPanel/N=Dialog/W=(225,105,525,305) as "Dialog"
 	AutoPositionWindow/M=0/R=$imagegraph
 	Button done,pos={119,150},size={50,20},title="Done"
-	Button done,proc=ChooseFVs_button
+	Button done,proc=ChooseCurvesOnMap_button
 	Button sall, pos={119,100},size={50,20},title="All"
-	Button sall,proc=ChooseFVs_button
+	Button sall,proc=ChooseCurvesOnMap_button
 	
 	DoWindow/F $imagegraph
 	SetWindow kwTopWin,hook(imageinspect)= $""
-	SetWindow kwTopWin,hook(choose)= chooser
+	SetWindow kwTopWin,hook(choose)=ChooseCurvesOnMap
 End
 
 
-Function ChooseFVs_button(ctrl) : ButtonControl
+Function ChooseCurvesOnMap_button(ctrl) : ButtonControl
 	String ctrl
 	
 	NVAR singlefc = :internalvars:singleFCs
@@ -745,8 +761,9 @@ Function ChooseFVs_button(ctrl) : ButtonControl
 		case "sall":
 			SVAR selectionwave = :internalvars:selectionwave
 			WAVE sel=$selectionwave
+			NVAR numcurves = :internalvars:numCurves
 			Variable i
-			for(i=0;i<(ksFVRowsize*ksFVRowSize);i+=1)
+			for(i=0;i<(numcurves);i+=1)
 				if (singlefc == 1)
 					WAVE/T fcmeta
 					sel[i] = NumberByKey("dataOffset", fcmeta[i])
@@ -762,7 +779,7 @@ Function ChooseFVs_button(ctrl) : ButtonControl
 End
 
 
-Function chooser(s)
+Function ChooseCurvesOnMap_Hook(s)
 	STRUCT WMWinHookStruct &s
 	Variable rval = 0
 	SVAR selectionwave = :internalvars:selectionwave
@@ -773,16 +790,18 @@ Function chooser(s)
 	if ((s.eventCode == 3) && (s.eventMod & 1 != 0))
 		Variable mouseY = s.mouseLoc.v
 		Variable mouseX = s.mouseLoc.h
-
+		
+		NVAR rowsize = :internalvars:FVRowSize
+		
 		// Get image pixel and force curve number
 		Variable pixelY = round(AxisValFromPixel(imagegraph, "left", mouseY-s.winrect.top))
 		Variable pixelX = round(AxisValFromPixel(imagegraph, "bottom", mouseX-s.winrect.left))
 
-		if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1))
+		if(pixelX >= 0 && pixelX <= (rowsize-1) && pixelY >= 0 && pixelY <= (rowsize-1))
 			DrawPointMarker(imagegraph, pixelX, pixelY, 0)
 			// Write selected fc offset to selection wave
 			WAVE sel=$selectionwave
-			Variable fcnum = pixelX+(pixelY*ksFVRowSize)
+			Variable fcnum = pixelX+(pixelY*rowsize)
 			if (singlefc == 1)
 				WAVE/T fcmeta
 				sel[fcnum] = NumberByKey("dataOffset", fcmeta[fcnum])
@@ -804,12 +823,12 @@ End
 Function ReadFCsInFolder()
 
 	Variable result
-	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
 	SVAR selectionwave = :internalvars:selectionwave
 	SVAR imagegraph = :internalvars:imagegraph
 
 	
+	NVAR numcurves = :internalvars:numCurves
 	DoWindow/F $imagegraph	// Bring graph to front
 	if (V_Flag == 0)			// Verify that graph exists
 		Print "No image graph found"
@@ -825,7 +844,9 @@ Function ReadFCsInFolder()
 	
 	// read selected FCs into 2d wave (1 curve per column, leave empty columns if wave not selected)
 	Variable i=0
-	for (i=0; i < totalWaves; i+=1)						
+	for (i=0; i < numcurves; i+=1)						
+		Prog("ReadWaves",i,numcurves)
+		
 		if(dataOffsets[i])
 			fileName = StringByKey("filename", fcmeta[i])
 			GBLoadWave/N=fcload/B/Q/S=(dataOffsets[i])/T={16,4}/U=(ksFCPoints)/W=2 fileName
@@ -844,20 +865,17 @@ Function ReadFCsInFolder()
 			endif
 		endif
 
-		Prog("ReadWaves",i,totalWaves)
 		
 	endfor
 	
 	printf "Elapsed time: %g seconds\r",round(10*(ticks-t0)/60)/10
 
-	// Create 2 waves
-	// One holds file and wave names, the other the corresponding brush heights
+	// Create wave for the brush heights
 	// Value will be filled in AnalyseBrushHeight
 	// Old waves will be overwritten
 	// (same for retractfeature)
-	Make/T/O/N=(totalWaves, 2) brushheight_names = {"", ""}
-	Make/O/N=(totalWaves) brushheights = NaN
-	Make/O/N=(totalWaves) retractfeature = NaN
+	Make/O/N=(numcurves) brushheights = NaN
+	Make/O/N=(numcurves) retractfeature = NaN
 	
 	KillWaves/Z fcload0, fcload1
 
@@ -870,11 +888,11 @@ Function ReadFCsInFile(fileName)
 	
 	Variable result
 	Variable index=0
-	Variable totalWaves=ksFVRowSize*ksFVRowSize
 	Variable success=0
 	SVAR fvmeta
 	SVAR selectionwave = :internalvars:selectionwave
 	SVAR imagegraph = :internalvars:imagegraph
+	NVAR numcurves = :internalvars:numCurves
 
 	
 	DoWindow/F $imagegraph	// Bring graph to front
@@ -912,20 +930,18 @@ Function ReadFCsInFile(fileName)
 
 		index += 1
 		
-		Prog("ReadWaves",index,totalWaves)
+		Prog("ReadWaves",index,numcurves)
 		
-	while (index<totalWaves)
+	while (index < numcurves)
 	
 	printf "Elapsed time: %g seconds\r",round(10*(ticks-t0)/60)/10
 
-	// Create 2 waves
-	// One holds file and wave names, the other the corresponding brush heights
+	// Create wave for the brush heights
 	// Value will be filled in AnalyseBrushHeight
 	// Old waves will be overwritten
 	// (same for retractfeature)
-	Make/T/O/N=(totalWaves, 2) brushheight_names = {"", ""}
-	Make/O/N=(totalWaves) brushheights = NaN
-	Make/O/N=(totalWaves) retractfeature = NaN
+	Make/O/N=(numcurves) brushheights = NaN
+	Make/O/N=(numcurves) retractfeature = NaN
 	
 	KillWaves/Z fcload0, fcload1
 
@@ -939,6 +955,7 @@ Function rinspector(s)			//retractfeature
 	Variable rval = 0
 	variable mouseloc,xval,yval, xbla,ybla
 	SVAR selectionwave = :internalvars:selectionwave
+	NVAR rowsize = :internalvars:FVRowSize
 
 
 	if ((s.eventCode == 3) && (s.eventMod & 1 != 0))
@@ -953,14 +970,14 @@ Function rinspector(s)			//retractfeature
 			wave sel=$selectionwave
 
 
-			if(xbla>=0 && xbla<=(ksFVRowSize-1) && ybla>=0 && ybla<=(ksFVRowSize-1) && sel[xbla+(ybla*ksFVRowSize)])
+			if(xbla>=0 && xbla<=(rowsize-1) && ybla>=0 && ybla<=(rowsize-1) && sel[xbla+(ybla*rowsize)])
 
-				rplot2(abs(xbla+(ybla*ksFVRowSize)))
+				rplot2(abs(xbla+(ybla*rowsize)))
 
 
-				print "FCNumber:",xbla+(ybla*ksFVRowSize)
+				print "FCNumber:",xbla+(ybla*rowsize)
 				print "X:",xbla,"Y:",ybla
-				//print "Brushheight for selection:",brushheights[xbla+(ybla*ksFVRowSize)],"nm"
+				//print "Brushheight for selection:",brushheights[xbla+(ybla*rowsize)],"nm"
 
 			else
 
@@ -997,20 +1014,22 @@ Function inspector(s)			//heightsmap
 		return rval
 	endif
 	
+	NVAR rowsize = :internalvars:FVRowSize
+	
 	Variable mouseX = s.mouseLoc.h
 	Variable mouseY = s.mouseLoc.v
 	Variable pixelX = round(AxisValFromPixel("", "bottom", mouseX - s.winrect.left))
 	Variable pixelY = round(AxisValFromPixel("", "left", mouseY - s.winrect.top))
-	Variable fcnum = abs(pixelX+(pixelY*ksFVRowSize))
+	Variable fcnum = abs(pixelX+(pixelY*rowsize))
 	
 	switch (s.eventCode)
 	
 		// mousemoved
 		case 4:
-			if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1) && sel[fcnum])
+			if(pixelX >= 0 && pixelX <= (rowsize-1) && pixelY >= 0 && pixelY <= (rowsize-1) && sel[fcnum])
 				WAVE brushheights
 				Variable h = round(brushheights[fcnum]*10)/10
-				TextBox/W=$s.WinName/C/F=0/B=3/N=hovertext/A=LB/X=(pixelX/ksFVRowsize*100+10)/Y=(pixelY/ksFVRowsize*100) " " + num2str(h) + " "
+				TextBox/W=$s.WinName/C/F=0/B=3/N=hovertext/A=LB/X=(pixelX/rowsize*100+10)/Y=(pixelY/rowsize*100) " " + num2str(h) + " "
 			else
 				TextBox/W=$s.WinName/C/N=hovertext ""
 			endif
@@ -1023,7 +1042,7 @@ Function inspector(s)			//heightsmap
 			// only on left mouseclick
 			if (s.eventMod & 1 != 0)
 
-				if(pixelX >= 0 && pixelX <= (ksFVRowSize-1) && pixelY >= 0 && pixelY <= (ksFVRowSize-1) && sel[fcnum])
+				if(pixelX >= 0 && pixelX <= (rowsize-1) && pixelY >= 0 && pixelY <= (rowsize-1) && sel[fcnum])
 					// Put marker on selected pixel on image and result graphs
 					DrawPointMarker(imagegraph, pixelX, pixelY, 1)
 					DrawPointMarker(resultgraph, pixelX, pixelY, 1)
@@ -1874,15 +1893,15 @@ End
 
 Function FlagCurves()
 	
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
 	
-	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 	// Create wave for flagged pixels; 0 or NaN = not flagged; 1 = flagged
-	Make/O/N=(totalcurves) flaggedcurves=0
+	Make/O/N=(numcurves) flaggedcurves=0
 	
 	// Ask for flagging criteria (to be implemented)
 	Variable deflsenspct = 5
@@ -1927,7 +1946,7 @@ Function FlagCurves_deflsenspct(flagged, pct)
 	
 	WAVE flaggedW = $flagged
 	
-	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 	
 	SVAR selectionwave = :internalvars:selectionwave
 	WAVE sel = $selectionwave
@@ -1937,7 +1956,7 @@ Function FlagCurves_deflsenspct(flagged, pct)
 	
 	Variable i
 	Variable numflagged = 0
-	for (i=0; i < totalcurves; i+=1)
+	for (i=0; i < numcurves; i+=1)
 		if (sel[i])
 			deflmeta = NumberByKey("deflSens", fcmeta[i])
 			deflcalc = NumberByKey("deflSensFit", fcmeta[i])
@@ -1959,7 +1978,7 @@ Function FlagCurves_negbheight(flagged)
 	
 	WAVE flaggedW = $flagged
 	
-	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 	
 	SVAR selectionwave = :internalvars:selectionwave
 	WAVE sel = $selectionwave
@@ -1967,7 +1986,7 @@ Function FlagCurves_negbheight(flagged)
 	
 	Variable i
 	Variable numflagged = 0
-	for (i=0; i < totalcurves; i+=1)
+	for (i=0; i < numcurves; i+=1)
 		if (sel[i])
 			if (brushheights[i] < 0)
 				flaggedW[i] = 1
@@ -1988,7 +2007,7 @@ Function FlagCurves_bheightoutlier(flagged, sd)
 	
 	WAVE flaggedW = $flagged
 	
-	Variable totalcurves = ksFVRowSize * ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 	
 	SVAR selectionwave = :internalvars:selectionwave
 	WAVE sel = $selectionwave
@@ -1998,7 +2017,7 @@ Function FlagCurves_bheightoutlier(flagged, sd)
 	
 	Variable i
 	Variable numflagged = 0
-	for (i=0; i < totalcurves; i+=1)
+	for (i=0; i < numcurves; i+=1)
 		if (sel[i])
 			Variable diff = abs(brushheights[i] - V_avg)
 			if (diff > sd*V_sdev)
@@ -2013,26 +2032,26 @@ End
 
 
 Function ReviewCurvesAll()
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
 	
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
 	
-	Variable totalwaves = ksFVRowSize * ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 	
 	// Create accept and reject waves
-	Make/N=(totalWaves)/O heights_acc = NaN
-	Make/N=(totalWaves)/O heights_rej = NaN
+	Make/N=(numcurves)/O heights_acc = NaN
+	Make/N=(numcurves)/O heights_rej = NaN
 	
 	// Construct filter wave (all previously selected pixels)
 	SVAR selectionwave = :internalvars:selectionwave
 	WAVE sel = $selectionwave
-	Make/N=(totalwaves)/FREE filter = 0
+	Make/N=(numcurves)/FREE filter = 0
 	
 	Variable i
-	for (i=0; i < totalwaves; i+=1)
+	for (i=0; i < numcurves; i+=1)
 		if (sel[i])
 			filter[i] = 1
 		endif
@@ -2043,29 +2062,29 @@ End
 
 
 Function ReviewCurvesFlagged()
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
 	
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
 	
-	Variable totalwaves = ksFVRowSize * ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
 	
 	// Create accept and reject waves
-	Make/N=(totalWaves)/O heights_acc = NaN
-	Make/N=(totalWaves)/O heights_rej = NaN
+	Make/N=(numcurves)/O heights_acc = NaN
+	Make/N=(numcurves)/O heights_rej = NaN
 	
 	// Construct filter wave (selected pixels AND flagged pixels) [logical AND]
 	SVAR selectionwave = :internalvars:selectionwave
 	WAVE sel = $selectionwave
 	WAVE fl = flaggedcurves
 	WAVE heights = brushheights
-	Make/N=(totalwaves)/FREE filter = 0
+	Make/N=(numcurves)/FREE filter = 0
 	
 	Variable i
 	Variable autoacc = 0
-	for (i=0; i < totalwaves; i+=1)
+	for (i=0; i < numcurves; i+=1)
 		if (sel[i])
 			// if flagged, put into review filter; otherwise automatically accept
 			if (fl[i] == 1)
@@ -2088,23 +2107,24 @@ End
 
 
 Function MarkFlaggedPixels()
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
 	
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
 	
-	Variable totalwaves = ksFVRowSize * ksFVRowSize
+	NVAR numcurves = :internalvars:numCurves
+	NVAR rowsize = :internalvars:FVRowSize
 	SVAR imagegraph = :internalvars:imagegraph
 	SVAR resultgraph = :internalvars:resultgraph
 	WAVE fl = flaggedcurves
 	Variable i
 	Variable first = 1
-	for (i=0; i < totalwaves; i+=1)
+	for (i=0; i < numcurves; i+=1)
 		if (fl[i] == 1)
-			Variable pixelX = mod(i,ksFVRowSize)
-			Variable pixelY = floor(i/ksFVRowSize)
+			Variable pixelX = mod(i,rowsize)
+			Variable pixelY = floor(i/rowsize)
 			if (first)
 				DrawPointMarker(imagegraph, pixelX, pixelY, 1)
 				DrawPointMarker(resultgraph, pixelX, pixelY, 1)
@@ -2146,6 +2166,8 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 	
 	SVAR imagegraph = :internalvars:imagegraph
 	SVAR resultgraph = :internalvars:resultgraph
+	
+	NVAR rowsize = :internalvars:FVRowSize
 
 	WaveStats/Q inputw
 	Variable totalcurves = V_npnts
@@ -2172,8 +2194,8 @@ Function ReviewCurves(inputWname, accWname, rejWname, filter)
 	
 	for (i=0; i < wavesize; i+=1)
 		if (filter[i] == 1)			
-			Variable pixelX = mod(i,ksFVRowSize)
-			Variable pixelY = floor(i/ksFVRowSize)
+			Variable pixelX = mod(i,rowsize)
+			Variable pixelY = floor(i/rowsize)
 			
 			header = fcmeta[i]
 
@@ -2339,8 +2361,8 @@ End
 
 
 Function ImageToForeground()
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -2351,8 +2373,8 @@ End
 
 
 Function MapToForeground()
-	NVAR/Z isMapLoaded = :internalvars:isMapLoaded
-	if (!NVAR_Exists(isMapLoaded) || isMapLoaded != 1)
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif

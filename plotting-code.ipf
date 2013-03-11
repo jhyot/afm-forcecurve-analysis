@@ -135,10 +135,11 @@ Function PlotFC_plotdata(index)
 	PlotFC_setzoom(zoomlvl)	
 	
 	WAVE brushheights
+	NVAR rowsize = :internalvars:FVRowSize
 	
 	String text="", text2=""
-	text = "FC: " + num2str(index) + ";   X: " + num2str(mod(index,ksFVRowSize))
-	text += "; Y:" + num2str(floor(index/ksFVRowSize))
+	text = "FC: " + num2str(index) + ";   X: " + num2str(mod(index,rowsize))
+	text += "; Y:" + num2str(floor(index/rowsize))
 
 	if (mode==0)
 		sprintf text2, "\rBrush height: %.2f nm", brushheights[index]
@@ -203,10 +204,11 @@ Function PlotFC_navigate(s)
 	if (ret == 1)
 		PlotFC_setzoom(defZoom)
 		
+		NVAR rowsize = :internalvars:FVRowSize
 		SVAR imagegraph = :internalvars:imagegraph
 		SVAR resultgraph = :internalvars:resultgraph
-		Variable pixelX = mod(index, ksFVRowSize)
-		Variable pixelY = floor(index/ksFVRowSize)
+		Variable pixelX = mod(index, rowsize)
+		Variable pixelY = floor(index/rowsize)
 		DrawPointMarker(imagegraph, pixelX, pixelY, 1)
 		DrawPointMarker(resultgraph, pixelX, pixelY, 1)
 	endif
@@ -416,10 +418,11 @@ Function plot2(idx)
 	ModifyGraph zero=8
 	
 	WAVE brushheights
+	NVAR rowsize = :internalvars:FVRowSize
 	
 	String text, text2
-	text = "FC: " + num2str(idx) + ";   X: " + num2str(mod(idx,ksFVRowSize))
-	text += "; Y:" + num2str(floor(idx/ksFVRowSize))
+	text = "FC: " + num2str(idx) + ";   X: " + num2str(mod(idx,rowsize))
+	text += "; Y:" + num2str(floor(idx/rowsize))
 	sprintf text2, "\rBrush height: %.2f nm", brushheights[idx]
 	TextBox/A=RT (text + text2)
 	
@@ -552,6 +555,8 @@ Function DrawPointMarker(graph, xpos, ypos, del)
 	Variable del					// delete old markers before drawing new one (0=no, 1=yes)
 	Variable marker
 	
+	NVAR rowsize = :internalvars:FVRowSize
+	
 	DoWindow $graph
 	if (V_flag == 0)
 		// graph does not exist
@@ -567,7 +572,7 @@ Function DrawPointMarker(graph, xpos, ypos, del)
 	endif
 	
 	SetDrawEnv/W=$graph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
-	DrawRect/W=$graph (xpos+0.3)/ksFVRowSize, 1-(ypos+0.3)/ksFVRowSize,  (xpos+0.7)/ksFVRowSize, 1-(ypos+0.7)/ksFVRowSize
+	DrawRect/W=$graph (xpos+0.3)/rowsize, 1-(ypos+0.3)/rowsize,  (xpos+0.7)/rowsize, 1-(ypos+0.7)/rowsize
 	
 	SetDrawLayer/W=$graph $lastLayer
 End
