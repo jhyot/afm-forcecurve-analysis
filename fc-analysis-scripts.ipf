@@ -413,6 +413,8 @@ Function LoadSingleFCFolder(path)
 	String/G :internalvars:totalpath = S_path
 	SVAR pathstr = :internalvars:totalpath
 	
+	Variable t0 = ticks
+	
 	String filename = ""
 	Make/T/FREE/N=0 filenames = ""
 	//WAVE/T filenames
@@ -480,8 +482,9 @@ Function LoadSingleFCFolder(path)
 	Variable/G :internalvars:FVRowsize = 0
 	
 	print pathstr + " "  + num2str(numread) + " files loaded into " + TidyDFName(GetDataFolder(1))
+	printf "Elapsed time: %g seconds\r",round(10*(ticks-t0)/60)/10
 	
-	// probably height data not yet correctly read out and "calibrated"
+	// maybe height data not yet correctly read out and "calibrated"
 	// for now just transform it so that the overall topography looks ok
 	WaveStats/Q fc_z
 	fc_z -= V_max
