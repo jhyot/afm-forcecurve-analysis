@@ -837,15 +837,8 @@ Function ReadFCsInFolder()
 	Variable result
 	Variable success=0
 	SVAR selectionwave = :internalvars:selectionwave
-	SVAR imagegraph = :internalvars:imagegraph
-
 	
 	NVAR numcurves = :internalvars:numCurves
-	DoWindow/F $imagegraph	// Bring graph to front
-	if (V_Flag == 0)			// Verify that graph exists
-		Print "No image graph found"
-		return -1
-	endif
 	
 	variable t0=ticks
 	
