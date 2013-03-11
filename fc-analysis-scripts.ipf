@@ -127,11 +127,7 @@ End
 // Also sets global variable isDataLoaded to 1.
 Function LoadForceMap()
 
-	if (CheckRoot() < 0)
-		return -1
-	endif
-
-	NewDataFolder/O internalvars
+	SetSettings()
 	
 	Variable/G :internalvars:isDataLoaded = 0
 	NVAR isDataLoaded = :internalvars:isDataLoaded
@@ -392,11 +388,7 @@ End
 Function LoadSingleFCFolder(path)
 	String path				// Path string to folder with FCs
 	
-	if (CheckRoot() < 0)
-		return -1
-	endif
-	
-	NewDataFolder/O internalvars
+	SetSettings()
 	
 	Variable/G :internalvars:isDataLoaded = 0
 	NVAR isDataLoaded = :internalvars:isDataLoaded
@@ -2432,6 +2424,31 @@ Function ReviewCurves_ChgDefzoom(ctrlName, popnum, popstr)
 End
 
 
+Function SetSettings()
+
+	if (CheckRoot() < 0)
+		return -1
+	endif
+	
+	if (!DataFolderExists("internalvars"))
+		NewDataFolder internalvars
+	endif
+	
+	Variable fric = NumVarOrDefault(":internalvars:loadFriction", 0)
+	Variable zsens = NumVarOrDefault(":internalvars:loadZSens", 0)
+	String list = "Yes;No;"
+	
+	String fricStr = SelectString(fric, "No", "Yes")
+	String zsensStr = SelectString(zsens, "No", "Yes")
+	
+	Prompt fricStr, "Load Friction data?", popup, list
+	Prompt zsensStr, "Load Z Sensor data?", popup, list
+	DoPrompt "Set Settings", fricStr, zsensStr
+	
+	Variable/G :internalvars:loadFriction = (cmpstr(fricStr, "Yes") == 0) ? 1 : 0
+	Variable/G :internalvars:loadZSens = (cmpstr(zsensStr, "Yes") == 0) ? 1 : 0
+	
+End
 
 
 
@@ -2483,6 +2500,7 @@ Function PrintInfoDF(df)
 End
 
 
+// Return -1 if user is in root and does not want to continue; 0 otherwise
 Function CheckRoot()
 	String df = GetDataFolder(0)
 	if (cmpstr(df, "root") == 0)
