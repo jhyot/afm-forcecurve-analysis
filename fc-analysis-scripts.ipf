@@ -593,7 +593,7 @@ Function CreateLineSingleFCs()
 	for (i=1; i < num; i+=1)
 		xdist = fc_x[i] - fc_x[i-1]
 		ydist = fc_y[i] - fc_y[i-1]
-		fc_zx[i] = sqrt(xdist*xdist + ydist*ydist)
+		fc_zx[i] = fc_zx[i-1] + sqrt(xdist*xdist + ydist*ydist)
 	endfor
 	
 	return 0
@@ -603,7 +603,6 @@ End
 Function CreateMapSingleFCs()
 	
 	WAVE/T fcmeta
-	
 	NVAR num = :internalvars:numCurves
 	Variable/G :internalvars:FVRowsize = ceil(sqrt(num))
 	NVAR dimnum = :internalvars:FVRowsize
