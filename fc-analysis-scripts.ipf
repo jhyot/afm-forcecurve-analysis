@@ -1568,26 +1568,37 @@ Function ParseFCHeader(filename, headerwave, titleswave, headerData)
 	headerData += "deflSens:" + num2str(sens) + ";"
 	
 	
-	// Z sensor channel
-	index = Header_FindDataType(fullheader, subGroupTitles, "ZSensor")
-	if (index < 0)
-		Print filename + ": Didn't find ZSensor data"
-		return -1
+	NVAR loadzsens = :internalvars:loadZSens	
+	if (loadzsens)
+		// Z sensor channel
+		index = Header_FindDataType(fullheader, subGroupTitles, "ZSensor")
+		if (index < 0)
+			Print filename + ": Didn't find ZSensor data"
+			return -1
+		endif
+		
+		offs = Header_GetDataOffset(fullheader, subGroupTitles, index)
+		if (offs <= 0)
+			Print filename + ": ZSensor: Data offset invalid"
+			return -1
+		endif
+		headerData += "ZdataOffset:" + num2str(offs) + ";"
+		
+		VPerLSB = Header_GetLSBScale(fullheader, subGroupTitles, index)
+		if (springConst <= 0)
+			Print filename + ": ZSensor: V/LSB scale invalid"
+			return -1
+		endif
+		headerData += "ZVPerLSB:" + num2str(VPerLSB) + ";"
+		
+		sens = Header_GetSens(fullheader, subGroupTitles, "ZsensSens")
+		if (sens <= 0)
+			Print filename + ": ZSensor: Deflection sensitivity invalid"
+			return -1
+		endif
+		headerData += "ZSens:" + num2str(sens) + ";"
 	endif
 	
-	offs = Header_GetDataOffset(fullheader, subGroupTitles, index)
-	if (offs <= 0)
-		Print filename + ": ZSensor: Data offset invalid"
-		return -1
-	endif
-	headerData += "ZdataOffset:" + num2str(offs) + ";"
-	
-	VPerLSB = Header_GetLSBScale(fullheader, subGroupTitles, index)
-	if (springConst <= 0)
-		Print filename + ": ZSensor: V/LSB scale invalid"
-		return -1
-	endif
-	headerData += "ZVPerLSB:" + num2str(VPerLSB) + ";"
 	
 	NVAR loadfric = :internalvars:loadFriction	
 	if (loadfric)
@@ -1613,13 +1624,9 @@ Function ParseFCHeader(filename, headerwave, titleswave, headerData)
 		headerData += "FricVPerLSB:" + num2str(VPerLSB) + ";"
 		
 		// don't read friction sensitivity, because usually is not calibrated
-	sens = Header_GetSens(fullheader, subGroupTitles, "ZsensSens")
-	if (sens <= 0)
-		Print filename + ": ZSensor: Deflection sensitivity invalid"
-		return -1
 	endif
-	headerData += "ZSens:" + num2str(sens) + ";"
 	
+		
 	return 0
 End
 
