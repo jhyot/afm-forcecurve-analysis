@@ -58,32 +58,31 @@ Constant ksHardwallFitFraction = 0.02	// defines end of hardwall part, the close
 
 // Create Igor Menu
 Menu "Force Map Analysis"
-	Submenu "Force Volume"
-		"Load File", LoadForceMap()
-		"Choose Force Curves", ChooseForceCurves()
-		"Do Analysis", Analysis()
-		"Load and Analyse Full Map", LoadandAnalyseAll()
-	End
-	Submenu "Force Curves"
-		"Load Folder", LoadSingleFCFolder("")
-	End
+	"Load FV File...", LoadForceMap()
+	"Load and Analyse Whole FV Map...", LoadandAnalyseAll()
 	"-"
-	"Load Image", LoadImage()
+	"Load FC Folder...", LoadSingleFCFolder("")
+	"-"
+	"Read Curves Into Igor...", ReadForceCurves()
+	"Start Analysis", Analysis()
+	"-"
+	"Load Image...", LoadImage()
 	"Show Image", ImageToForeground()
 	"Show Height Map", MapToForeground()
 	"-"
 	Submenu "Review"
-		"Flag curves", FlagCurves()
+		"Flag curves...", FlagCurves()
 		"Mark flagged", MarkFlaggedPixels()
 		"-"
 		"Review Flagged Curves", ReviewCurvesFlagged()
 		"Review All Curves", ReviewCurvesAll()
 	End
+	"-"
+	"Settings...", SetSettings()
 End
 
 
 Function LoadandAnalyseAll()
-
 	Variable result
 	
 	result = LoadForceMap()
