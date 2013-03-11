@@ -1916,6 +1916,8 @@ Function ReadHeaderLines(filename, headerwave)
 	String filename			// Full Igor-style path to filename ("folder:to:file.ext")
 	String headerwave		// Name of the text wave for header data (will be overwritten)
 	
+	Variable maxlength = 100000		// max length of file to read in bytes
+	
 	Variable result = -1			// Set to 0 if end of header found
 	
 	if (strlen(fileName) == 0)
@@ -1931,12 +1933,13 @@ Function ReadHeaderLines(filename, headerwave)
 	Make/T/O/N=0 $headerwave		// Make new text wave, overwrite old if needed
 	WAVE/T fullheader=$headerwave
 	
-	Variable len
-	String buffer
+	Variable len = 0
+	String buffer = ""
 	Variable line = 0
+	Variable totlength = 0
 	
 	do
-		FReadLine refNum, buffer
+		FReadLine/N=1000 refNum, buffer
 		
 		len = strlen(buffer)
 		if (len == 0)
@@ -1945,6 +1948,11 @@ Function ReadHeaderLines(filename, headerwave)
 		
 		if (cmpstr(buffer[0,len-2], ksHeaderEnd) == 0)
 			result = 0								// End of header reached
+			break
+		endif
+		
+		totlength += len
+		if (totlength > maxlength)
 			break
 		endif
 		
