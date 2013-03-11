@@ -326,6 +326,65 @@ Function PlotFC_setzoom(level)
 End
 
 
+// Plots line cross-section topography with brush height;
+// and single curves (defl + friction) based on marker point in the cross-section plot
+Function PlotXsectFC()
+	WAVE brushheights, fc_z, fc, fc_fric, fc_x_tsd
+	
+	Display/T brushheights,fc_z
+	AppendToGraph/L=fc fc[][0]
+	AppendToGraph/L=fc fc_fric[][0]
+	AppendToGraph/L=fc fc[][0]/TN=fc_tsd vs fc_x_tsd[][0]
+	
+	ModifyGraph rgb(brushheights)=(65280,0,0), rgb(fc_z)=(0,0,0)
+	ModifyGraph rgb(fc)=(0,15872,65280), rgb(fc_fric)=(65280,0,0), rgb(fc_tsd)=(0,0,0)
+	
+	ModifyGraph mode(brushheights)=7, hbFill(brushheights)=2, toMode(brushheights)=3
+	ModifyGraph offset(fc_fric)={0,300}, muloffset(fc_fric)={0,3000}
+	ModifyGraph offset(fc_tsd)={30,0}
+	ModifyGraph standoff=0, zero(left)=1
+	ModifyGraph freePos(fc)={0,kwFraction}
+	ModifyGraph axisEnab(left)={0.65,1}
+	ModifyGraph axisEnab(fc)={0,0.6}
+	
+	SetAxis bottom 0,100
+	
+	String text = "FC: 0"
+	TextBox/C/N=fcinfobox/A=RC text
+	
+	ShowInfo
+	
+	SetWindow kwTopWin, hook(xsectcursor)=PlotXsectFC_movecursor
+End
+
+Function PlotXsectFC_movecursor(s)
+	STRUCT WMWInHookStruct &s
+	
+	if (s.eventcode != 7)
+		return 0
+	endif
+	
+	// eventcode 7 = cursormoved
+	
+	if (cmpstr(s.traceName, "brushheights") == 0 || cmpstr(s.traceName, "fc_z") == 0)
+		Variable pt = s.pointNumber
+		
+		WAVE fc, fc_fric, fc_x_tsd
+		
+		ReplaceWave trace=fc, fc[][pt]
+		ReplaceWave trace=fc_fric, fc_fric[][pt]
+		ReplaceWave trace=fc_tsd, fc[][pt]
+		ReplaceWave/X trace=fc_tsd, fc_x_tsd[][pt]
+		
+		String text = "FC: " + num2str(pt)
+		TextBox/C/N=fcinfobox text
+		
+		return 1
+	endif
+	
+End
+
+
 // Print the name of the data folder onto the graph
 // If a graph is in front, use the data folder of the first trace/image
 // Otherwise use current data folder
