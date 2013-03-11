@@ -526,6 +526,13 @@ Function LoadSingleFCFolder(path)
 	
 	Variable/G :internalvars:singleFCs = 1
 	
+	Make/O/N=(ksFCPoints, numread) fc=NaN, rfc=NaN
+	
+	NVAR loadfric = :internalvars:loadFriction
+	if (loadfric)
+		Make/O/N=(ksFCPoints, numread) fc_fric=NaN, rfc_fric=NaN
+	endif
+	
 	if (Exists("tempFCpath"))
 		KillPath tempFCpath
 	endif
@@ -842,12 +849,20 @@ Function ReadFCsInFolder()
 	WAVE/T fcmeta
 	String fileName = ""
 	
+	NVAR loadfric = :internalvars:loadFriction
+	if (loadfric)
+		WAVE fc_fric, rfc_fric
+	endif
+	
+	Variable fricOffs = 0
+	
 	// read selected FCs into 2d wave (1 curve per column, leave empty columns if wave not selected)
 	Variable i=0
 	for (i=0; i < numcurves; i+=1)						
 		Prog("ReadWaves",i,numcurves)
 		
 		if(dataOffsets[i])
+			// Read vertical deflection
 			fileName = StringByKey("filename", fcmeta[i])
 			GBLoadWave/N=fcload/B/Q/S=(dataOffsets[i])/T={16,4}/U=(ksFCPoints)/W=2 fileName
 			
@@ -862,10 +877,27 @@ Function ReadFCsInFolder()
 				success += 1
 			else
 				Print "Did not find approach + retract curves at index " + num2str(i)
+				continue
 			endif
-		endif
-
-		
+			
+			// Read horizontal deflection (friction)
+			if (loadfric)
+				fricOffs = NumberByKey("FricDataOffset", fcmeta[i])
+				GBLoadWave/N=fcfricload/B/Q/S=(fricOffs)/T={16,4}/U=(ksFCPoints)/W=2 fileName
+				
+				if (V_flag == 2)
+					WAVE fcloaded = $(StringFromList(0, S_waveNames))
+					WAVE rfcloaded = $(StringFromList(1, S_waveNames))
+					
+					fc_fric[][i] = fcloaded[p] 
+					rfc_fric[][i] = rfcloaded[p]
+					
+				else
+					Print "Did not find friction approach + retract curves at index " + num2str(i)
+				endif
+			endif
+			
+		endif		
 	endfor
 	
 	printf "Elapsed time: %g seconds\r",round(10*(ticks-t0)/60)/10
@@ -1557,6 +1589,30 @@ Function ParseFCHeader(filename, headerwave, titleswave, headerData)
 	endif
 	headerData += "ZVPerLSB:" + num2str(VPerLSB) + ";"
 	
+	NVAR loadfric = :internalvars:loadFriction	
+	if (loadfric)
+		// Friction channel
+		index = Header_FindDataType(fullheader, subGroupTitles, "Lateral")
+		if (index < 0)
+			Print filename + ": Didn't find Friction data"
+			return -1
+		endif
+		
+		offs = Header_GetDataOffset(fullheader, subGroupTitles, index)
+		if (offs <= 0)
+			Print filename + ": Friction: Data offset invalid"
+			return -1
+		endif
+		headerData += "FricDataOffset:" + num2str(offs) + ";"
+		
+		VPerLSB = Header_GetLSBScale(fullheader, subGroupTitles, index)
+		if (springConst <= 0)
+			Print filename + ": Friction: V/LSB scale invalid"
+			return -1
+		endif
+		headerData += "FricVPerLSB:" + num2str(VPerLSB) + ";"
+		
+		// don't read friction sensitivity, because usually is not calibrated
 	sens = Header_GetSens(fullheader, subGroupTitles, "ZsensSens")
 	if (sens <= 0)
 		Print filename + ": ZSensor: Deflection sensitivity invalid"

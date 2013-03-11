@@ -103,6 +103,7 @@ Function Analysis()
 	// Set flag immediately before analysis starts to warn the user if he re-runs the analysis
 	Variable/G :internalvars:analysisDone = 1
 	
+	NVAR loadfric = :internalvars:loadFriction
 	
 	for (i=0; i < numcurves; i+=1)
 	
@@ -117,6 +118,14 @@ Function Analysis()
 			SetScale/I x 0, (rampSize), "nm", fc_blfit
 			SetScale/I x 0, (rampSize/8), "nm", fc_sensfit
 			SetScale/I x 0, (rampSize), "nm", fc_expfit
+			
+			if (loadfric)
+				WAVE fc_fric, rfc_fric
+				fc_fric[][i] *= NumberByKey("FricVPerLSB", fcmeta[i])
+				rfc_fric[][i] *= NumberByKey("FricVPerLSB", fcmeta[i])
+				SetScale/I x, 0, (rampSize), "nm", fc_fric
+				SetScale/I x, 0, (rampSize), "nm", rfc_fric
+			endif
 		
 			result = AnalyseBrushHeight3(i, brushheights)
 			if(result < 0)
