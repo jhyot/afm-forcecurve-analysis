@@ -333,19 +333,22 @@ Function PlotXsectFC()
 	
 	Display/T brushheights,fc_z
 	AppendToGraph/L=fc fc[][0]
-	AppendToGraph/L=fc fc_fric[][0]
+	AppendToGraph/R fc_fric[][0]
 	AppendToGraph/L=fc fc[][0]/TN=fc_tsd vs fc_x_tsd[][0]
 	
 	ModifyGraph rgb(brushheights)=(65280,0,0), rgb(fc_z)=(0,0,0)
 	ModifyGraph rgb(fc)=(0,15872,65280), rgb(fc_fric)=(65280,0,0), rgb(fc_tsd)=(0,0,0)
+	ModifyGraph useNegRGB(brushheights)=1, negRGB(brushheights)=(32768,54528,65280)
 	
-	ModifyGraph mode(brushheights)=7, hbFill(brushheights)=2, toMode(brushheights)=3
-	ModifyGraph offset(fc_fric)={0,300}, muloffset(fc_fric)={0,3000}
+	ModifyGraph mode(brushheights)=7, hbFill(brushheights)=2, toMode(brushheights)=2, lsize(brushheights)=0
+	//ModifyGraph offset(fc_fric)={0,300}, muloffset(fc_fric)={0,3000}
 	ModifyGraph offset(fc_tsd)={30,0}
 	ModifyGraph standoff=0, zero(left)=1
 	ModifyGraph freePos(fc)={0,kwFraction}
+	ModifyGraph freePos(right)={0,kwFraction}
 	ModifyGraph axisEnab(left)={0.65,1}
 	ModifyGraph axisEnab(fc)={0,0.6}
+	ModifyGraph axisEnab(right)={0,0.6}
 	
 	SetAxis bottom 0,100
 	
