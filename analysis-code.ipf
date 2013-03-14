@@ -544,9 +544,11 @@ Function AnalyseBrushHeight3(index, wHeights)
 	// Fit baseline and subtract from curve
 	Variable noiseRange = round(0.1 * lastGoodPt)
 	Variable calcStep = round(0.2 * noiseRange)
-	Variable currentPt = lastGoodPt - noiseRange
+	// don't start at the end; the curve might look bad there (e.g. in Z closed loop mode)
+	Variable currentPt = 0.8 * lastGoodPt - noiseRange
 	WaveStats/Q/R=[currentPt - noiseRange, currentPt + noiseRange] w
 	Variable baselineNoise = V_sdev
+	
 	currentPt -= calcStep
 	do
 		WaveStats/Q/R=[currentPt - noiseRange, currentPt + noiseRange] w
