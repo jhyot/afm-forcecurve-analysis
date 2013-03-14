@@ -746,7 +746,7 @@ Function ChooseCurvesOnMap()
 	
 	DoWindow/F $imagegraph
 	SetWindow kwTopWin,hook(imageinspect)= $""
-	SetWindow kwTopWin,hook(choose)=ChooseCurvesOnMap
+	SetWindow kwTopWin,hook(choose)=ChooseCurvesOnMap_Hook
 End
 
 
