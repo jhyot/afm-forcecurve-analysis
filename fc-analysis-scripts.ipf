@@ -907,7 +907,7 @@ Function ReadFCsInFolder()
 	Make/O/N=(numcurves) brushheights = NaN
 	Make/O/N=(numcurves) retractfeature = NaN
 	
-	KillWaves/Z fcload0, fcload1
+	KillWaves/Z fcload0, fcload1, fcfricload0, fcfricload1
 
 	return success
 End
