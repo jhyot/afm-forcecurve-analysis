@@ -469,6 +469,18 @@ Function LoadSingleFCFolder(path)
 	String/G :internalvars:totalpath = S_path
 	SVAR pathstr = :internalvars:totalpath
 	
+	String datatypelst = "line;box;random"
+	String datatype = "line"
+	Prompt datatype, "Type", popup, datatypelst
+	DoPrompt "How were the curves recorded?", datatype
+	
+	if (V_flag == 1)
+		// user cancelled
+		print "User cancelled loading."
+		return -1
+	endif
+	
+	
 	Variable t0 = ticks
 	
 	String filename = ""
@@ -520,7 +532,7 @@ Function LoadSingleFCFolder(path)
 			continue
 		endif
 		
-		headerData += "filename:" + fullFilename
+		headerData += "filename:" + fullFilename + ";"
 		
 		Redimension/N=(numread+1) fcmeta
 		fcmeta[numread] = headerData
@@ -545,16 +557,6 @@ Function LoadSingleFCFolder(path)
 	WaveStats/Q fc_z
 	fc_z -= V_max
 	fc_z *= -1
-	
-	String datatypelst = "line;box;random"
-	String datatype = "line"
-	Prompt datatype, "Type", popup, datatypelst
-	DoPrompt "How were the curves recorded?", datatype
-	
-	if (V_flag == 1)
-		// user cancelled
-		datatype = "cancel"
-	endif
 	
 	strswitch (datatype)
 		case "line":
