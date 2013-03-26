@@ -56,6 +56,13 @@ Constant ksHardwallFitFraction = 0.02	// defines end of hardwall part, the close
 
 
 
+
+// Internal constants, do not change
+Static Constant SETTINGS_LOADFRIC = 1
+Static Constant SETTINGS_LOADZSENS = 2
+
+
+
 // Create Igor Menu
 Menu "Force Map Analysis"
 	"Open FV File...", LoadForceMap()
@@ -125,7 +132,10 @@ End
 // Also sets global variable isDataLoaded to 1.
 Function LoadForceMap()
 
-	SetSettings()
+ 	if (SetSettings(0) < 0)
+ 		print "Loading aborted."
+ 		return -1
+ 	endif
 	
 	Variable/G :internalvars:isDataLoaded = 0
 	NVAR isDataLoaded = :internalvars:isDataLoaded
@@ -386,7 +396,10 @@ End
 Function LoadSingleFCFolder(path)
 	String path				// Path string to folder with FCs
 	
-	SetSettings()
+	if (SetSettings(SETTINGS_LOADFRIC + SETTINGS_LOADZSENS) < 0)
+		print "Loading aborted."
+		return -1
+	endif
 	
 	Variable/G :internalvars:isDataLoaded = 0
 	NVAR isDataLoaded = :internalvars:isDataLoaded
@@ -2424,8 +2437,16 @@ Function ReviewCurves_ChgDefzoom(ctrlName, popnum, popstr)
 	Variable/G :tmp_reviewDF:defzoom = popnum-1
 End
 
-
-Function SetSettings()
+// Ask user for settings and initialize environment
+Function SetSettings(flags)
+	// Flags is a bit field for settings
+	// 1: setting set / yes
+	// 0: setting unset / no
+	//
+	// bits:
+	// 0: load friction data (SETTINGS_LOADFRIC)
+	// 1: load zsensor data (SETTINGS_LOADZSENS)
+	Variable flags
 
 	if (CheckRoot() < 0)
 		return -1
@@ -2435,8 +2456,8 @@ Function SetSettings()
 		NewDataFolder internalvars
 	endif
 	
-	Variable fric = NumVarOrDefault(":internalvars:loadFriction", 0)
-	Variable zsens = NumVarOrDefault(":internalvars:loadZSens", 0)
+	Variable fric = NumVarOrDefault(":internalvars:loadFriction", flags & SETTINGS_LOADFRIC)
+	Variable zsens = NumVarOrDefault(":internalvars:loadZSens", flags & SETTINGS_LOADZSENS)
 	String list = "Yes;No;"
 	
 	String fricStr = SelectString(fric, "No", "Yes")
@@ -2445,6 +2466,11 @@ Function SetSettings()
 	Prompt fricStr, "Load Friction data?", popup, list
 	Prompt zsensStr, "Load Z Sensor data?", popup, list
 	DoPrompt "Set Settings", fricStr, zsensStr
+	
+	if (V_flag == 1)
+		// User pressed cancel
+		return -1
+	endif
 	
 	Variable/G :internalvars:loadFriction = (cmpstr(fricStr, "Yes") == 0) ? 1 : 0
 	Variable/G :internalvars:loadZSens = (cmpstr(zsensStr, "Yes") == 0) ? 1 : 0
