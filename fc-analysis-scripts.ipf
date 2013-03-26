@@ -68,6 +68,7 @@ Menu "Force Map Analysis"
 	"Open FV File...", LoadForceMap()
 	"Load and Analyse Whole FV Map...", LoadAndAnalyseAllFV()
 	"Open FC Folder...", LoadSingleFCFolder("")
+	"Load and Analyse Whole FC Folder...", LoadAndAnalyseAllFC("")
 	"-"
 	"\\M0Select / Load Curves", ReadForceCurves()
 	"Start Analysis", Analysis()
@@ -389,6 +390,49 @@ Function ReadMap(fileName)
 	Make/T/O/N=(numcurves) fcmeta=""
 
 	ShowImage()
+
+End
+
+
+Function LoadAndAnalyseAllFC(path)
+	String path
+	
+	Variable result
+	result = LoadSingleFCFolder(path)
+
+	if (result<0)
+		print "Aborted loading force curves"
+		return -1
+	endif
+	
+	Variable i
+	WAVE/T fcmeta
+	String/G :internalvars:selectionwave = "selectedcurves"
+	SVAR selectionwave = :internalvars:selectionwave
+	NVAR numcurves = :internalvars:numCurves
+
+	Make/O/N=(numcurves) $selectionwave = NaN
+
+
+	Wave sel=$selectionwave
+
+	for(i=0;i<(numcurves);i+=1)
+		sel[i] = NumberByKey("dataOffset", fcmeta[i])
+	endfor
+
+	SVAR totalpath = :internalvars:totalpath
+
+
+	ReadFCsInFolder()
+	
+	NVAR singlefc = :internalvars:singleFCs
+	NVAR rowsize = :internalvars:FVRowSize
+
+	Analysis()
+	
+	if (singlefc && (rowsize == 0))
+		PlotXsectFC()
+	endif
 
 End
 
