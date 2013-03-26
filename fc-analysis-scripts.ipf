@@ -66,7 +66,7 @@ Static Constant SETTINGS_LOADZSENS = 2
 // Create Igor Menu
 Menu "Force Map Analysis"
 	"Open FV File...", LoadForceMap()
-	"Load and Analyse Whole FV Map...", LoadandAnalyseAll()
+	"Load and Analyse Whole FV Map...", LoadAndAnalyseAllFV()
 	"Open FC Folder...", LoadSingleFCFolder("")
 	"-"
 	"\\M0Select / Load Curves", ReadForceCurves()
@@ -88,7 +88,7 @@ Menu "Force Map Analysis"
 End
 
 
-Function LoadandAnalyseAll()
+Function LoadAndAnalyseAllFV()
 	Variable result
 	
 	result = LoadForceMap()
