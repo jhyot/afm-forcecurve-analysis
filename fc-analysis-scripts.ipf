@@ -3,6 +3,7 @@
 
 
 #include ":fc-script-config"
+#include ":fitting"
 
 
 
