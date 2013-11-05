@@ -3,6 +3,8 @@
 
 
 #include ":fc-script-config"
+#include ":analysis-code"
+#include ":plotting-code"
 #include ":loader"
 #include ":parser"
 #include ":review-classify"
