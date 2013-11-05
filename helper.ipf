@@ -1,6 +1,5 @@
 #pragma rtGlobals=3		// Use modern global access method.
 
-#include ":fc-analysis-scripts"
 
 Function absrelheights(img, bheights, added, nobrushrel, nobrushabs)
 	String img, bheights, added, nobrushrel, nobrushabs

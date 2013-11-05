@@ -5,6 +5,7 @@
 #include ":fc-script-config"
 #include ":loader"
 #include ":parser"
+#include ":helper"
 #include ":styles"
 #include ":fitting"
 
