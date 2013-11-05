@@ -1,43 +1,8 @@
 #pragma rtGlobals=3		// Use modern global access method.
 //#pragma IndependentModule=ForceMapAnalysis  // disabled for easier debugging etc
 
-#include ":analysis-code"		// Analysis
-#include ":plotting-code"		// PlotFC
 
-
-// **** USER CONFIGURABLE CONSTANTS ****
-//
-// Change constants to adjust procedure behaviour
-
-// Allowed force map versions, comma separated
-// (add versions once they have been tested)
-StrConstant ksVersionReq = "0x07300000,0x08100000,0x08150300"
-
-// Points per FC
-// for now only works with 4096
-Constant ksFCPoints = 4096
-
-// Force curves per row.
-// Tested with 32 and 16 pixels per row
-Constant ksFVRowSize = 32
-
-// File types as written in header
-StrConstant ksFileTypeFV = "FVOL"
-StrConstant ksFileTypeFC = "FOL"
-
-// String to be matched (full match, case insensitive) at header end
-StrConstant ksHeaderEnd = "\\*File list end"
-
-// Brush height calculation parameters
-Constant ksBaselineFitLength = .3		// Fraction of points used for baseline fits
-Constant ksBrushCutoff = 45			// height from force in exponential fit (in pN)
-Constant ksBrushOverNoise = 1			// height from point on curve above noise multiplied by this factor
-Constant ksHardwallFitFraction = 0.02	// defines end of hardwall part, the closer to 0, the less of curve
-												// gets fitted (useful values 0.01 - 0.1) 
-
-//
-// **** END USER CONFIGURABLE CONSTANTS ****
-//
+#include ":fc-script-config"
 
 
 
