@@ -32,8 +32,8 @@
 
 
 // Internal constants, do not change
-Static Constant SETTINGS_LOADFRIC = 1
-Static Constant SETTINGS_LOADZSENS = 2
+Constant SETTINGS_LOADFRIC = 1
+Constant SETTINGS_LOADZSENS = 2
 
 
 
