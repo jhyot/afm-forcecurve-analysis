@@ -7,6 +7,7 @@
 #include ":parser"
 #include ":review-classify"
 #include ":helper"
+#include ":xsectanalysis-helper"
 #include ":styles"
 #include ":fitting"
 
