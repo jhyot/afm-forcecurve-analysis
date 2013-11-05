@@ -103,127 +103,6 @@ Function KillPreviousWaves()
 End
 
 
-
-
-
-
-Function rinspector(s)			//retractfeature
-	STRUCT WMWinHookStruct &s
-	Variable rval = 0
-	variable mouseloc,xval,yval, xbla,ybla
-	SVAR selectionwave = :internalvars:selectionwave
-	NVAR rowsize = :internalvars:FVRowSize
-
-
-	if ((s.eventCode == 3) && (s.eventMod & 1 != 0))
-			yval=s.mouseLoc.v
-			xval=s.mouseLoc.h
-
-
-			ybla=round(axisvalfrompixel("retractfeaturesdetection","left",yval-s.winrect.top))
-			xbla=round(axisvalfrompixel("retractfeaturesdetection","bottom",xval-s.winrect.left))
-
-
-			wave sel=$selectionwave
-
-
-			if(xbla>=0 && xbla<=(rowsize-1) && ybla>=0 && ybla<=(rowsize-1) && sel[xbla+(ybla*rowsize)])
-
-				rplot2(abs(xbla+(ybla*rowsize)))
-
-
-				print "FCNumber:",xbla+(ybla*rowsize)
-				print "X:",xbla,"Y:",ybla
-				//print "Brushheight for selection:",brushheights[xbla+(ybla*rowsize)],"nm"
-
-			else
-
-				print "No Data here!"
-
-			endif
-
-	endif
-
-	return rval
-
-End
-
-
-
-Function inspector(s)			//heightsmap
-	STRUCT WMWinHookStruct &s
-	Variable rval = 0
-	SVAR/Z selectionwave = :internalvars:selectionwave
-	SVAR/Z resultgraph = :internalvars:resultgraph
-	SVAR/Z imagegraph = :internalvars:imagegraph
-	
-	if (!(SVAR_Exists(selectionwave) && SVAR_Exists(resultgraph) && SVAR_Exists(imagegraph)))
-		return rval
-	endif
-	
-	WAVE/Z sel = $selectionwave
-	if (!WaveExists(sel))
-		return rval
-	endif
-	
-	// if event is from a graph that does not correspond to the saved graph names, ignore it
-	if ((cmpstr(s.WinName, imagegraph) != 0) && (cmpstr(s.WinName, resultgraph) !=0))
-		return rval
-	endif
-	
-	NVAR rowsize = :internalvars:FVRowSize
-	
-	Variable mouseX = s.mouseLoc.h
-	Variable mouseY = s.mouseLoc.v
-	Variable pixelX = round(AxisValFromPixel("", "bottom", mouseX - s.winrect.left))
-	Variable pixelY = round(AxisValFromPixel("", "left", mouseY - s.winrect.top))
-	Variable fcnum = abs(pixelX+(pixelY*rowsize))
-	
-	switch (s.eventCode)
-	
-		// mousemoved
-		case 4:
-			if(pixelX >= 0 && pixelX <= (rowsize-1) && pixelY >= 0 && pixelY <= (rowsize-1) && sel[fcnum])
-				WAVE brushheights
-				Variable h = round(brushheights[fcnum]*10)/10
-				TextBox/W=$s.WinName/C/F=0/B=3/N=hovertext/A=LB/X=(pixelX/rowsize*100+10)/Y=(pixelY/rowsize*100) " " + num2str(h) + " "
-			else
-				TextBox/W=$s.WinName/C/N=hovertext ""
-			endif
-			
-			rval = 0
-			break
-			
-		// mousedown
-		case 3:
-			// only on left mouseclick
-			if (s.eventMod & 1 != 0)
-
-				if(pixelX >= 0 && pixelX <= (rowsize-1) && pixelY >= 0 && pixelY <= (rowsize-1) && sel[fcnum])
-					// Put marker on selected pixel on image and result graphs
-					DrawPointMarker(imagegraph, pixelX, pixelY, 1)
-					DrawPointMarker(resultgraph, pixelX, pixelY, 1)
-					
-					// Show new graph with curve
-					PlotFC(fcnum)
-	
-					WAVE brushheights
-					WAVE/T fcmeta
-					
-					print "FCNumber: " + num2str(fcnum) + "; X: " + num2str(pixelX) + "; Y: " + num2str(pixelY) + "; Brush height:", brushheights[fcnum], "nm"
-					print fcmeta[fcnum]
-					
-					rval = 1
-				endif
-			endif
-			break
-	endswitch
-
-	return rval
-End
-
-
-
 // Ask user for settings and initialize environment
 Function SetSettings(flags)
 	// Flags is a bit field for settings
@@ -266,30 +145,11 @@ End
 
 
 
-Function ImageToForeground()
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
-		print "Error: no FV map loaded yet"
-		return -1
+	NVAR/Z isdataloaded = :internalvars:isDataLoaded
+	if (!NVAR_Exists(isdataloaded))
+		Variable/G :internalvars:isDataLoaded = 0
 	endif
 	
-	SVAR imagegraph = :internalvars:imagegraph
-	DoWindow/F $imagegraph
-End
-
-
-Function MapToForeground()
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
-		print "Error: no FV map loaded yet"
-		return -1
-	endif
-	
-	SVAR resultgraph = :internalvars:resultgraph
-	DoWindow/F $resultgraph
-End
-
-
 Function PrintInfo()
 	SVAR ig = :internalvars:imagegraph
 	SVAR iw = :internalvars:imagewave
