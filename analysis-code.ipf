@@ -46,20 +46,61 @@ Function Analysis()
 	// Save analysis parameters, or compare if already saved
 	SVAR/Z params = :internalvars:analysisparameters
 	NVAR rowsize = :internalvars:FVRowSize
+	NVAR fcpoints = :internalvars:FCNumPoints
+	
 	Variable conflict = 0
+	String conflictStr = ""
+	
 	if (SVAR_Exists(params))
-		if (ksFCPoints != NumberByKey("ksFCPoints", params))
+		if (fcpoints != NumberByKey("FCNumPoints", params))
 			conflict = 1
-		elseif (rowsize != NumberByKey("FVRowSize", params))
+			conflictstr += "FCNumPoints"
+			conflictstr += "\r"
+		endif
+		if (rowsize != NumberByKey("FVRowSize", params))
 			conflict = 1
-		elseif (ksBaselineFitLength != NumberByKey("ksBaselineFitLength", params))
+			conflictstr += "FVRowSize"
+			conflictstr += "\r"
+		endif
+		if (ksBaselineFitLength != NumberByKey("ksBaselineFitLength", params))
 			conflict = 1
-		elseif (ksBrushCutoff != NumberByKey("ksBrushCutoff", params))
+			conflictstr += "ksBaselineFitLength"
+			conflictstr += "\r"
+		endif
+		if (ksBrushCutoff != NumberByKey("ksBrushCutoff", params))
 			conflict = 1
-		elseif (ksBrushOverNoise != NumberByKey("ksBrushOverNoise", params))
+			conflictstr += "ksBrushCutoff"
+			conflictstr += "\r"
+		endif
+		if (ksBrushOverNoise != NumberByKey("ksBrushOverNoise", params))
 			conflict = 1
-		elseif (ksHardwallFitFraction != NumberByKey("ksHardwallFitFraction", params))
+			conflictstr += "ksBrushOverNoise"
+			conflictstr += "\r"
+		endif
+		if (ksDeflSens_ContactLen != NumberByKey("ksDeflSens_ContactLen", params))
 			conflict = 1
+			conflictstr += "ksDeflSens_ContactLen"
+			conflictstr += "\r"
+		endif
+		if (ksDeflSens_EdgeFraction != NumberByKey("ksDeflSens_EdgeFraction", params))
+			conflict = 1
+			conflictstr += "ksDeflSens_EdgeFraction"
+			conflictstr += "\r"
+		endif
+		if (ksFixDefl != NumberByKey("ksFixDefl", params))
+			conflict = 1
+			conflictstr += "ksFixDefl"
+			conflictstr += "\r"
+		endif
+		if (ksXDataZSens != NumberByKey("ksXDataZSens", params))
+			conflict = 1
+			conflictstr += "ksXDataZSens"
+			conflictstr += "\r"
+		endif
+		if (ksMaxGoodPt != NumberByKey("ksMaxGoodPt", params))
+			conflict = 1
+			conflictstr += "ksMaxGoodPt"
+			conflictstr += "\r"
 		endif
 	else
 		String/G :internalvars:analysisparameters = ""
@@ -68,7 +109,8 @@ Function Analysis()
 	
 	if (conflict)
 		alert = "Some analysis parameters do not match previously used ones for this data set.\r"
-		alert += "Continuing can lead to inconsistent results. Old parameters will be lost. Continue anyway?"
+		alert += "Continuing can lead to inconsistent results. Old parameters will be lost. Continue anyway?\r\r"
+		alert += conflictstr
 		DoAlert 1, alert
 		
 		if (V_flag != 1)
@@ -77,12 +119,17 @@ Function Analysis()
 		endif
 	endif
 	
-	params = ReplaceNumberByKey("ksFCPoints", params, ksFCPoints)
+	params = ReplaceNumberByKey("FCNumPoints", params, fcpoints)
 	params = ReplaceNumberByKey("FVRowSize", params, rowsize)
 	params = ReplaceNumberByKey("ksBaselineFitLength", params, ksBaselineFitLength)
 	params = ReplaceNumberByKey("ksBrushCutoff", params, ksBrushCutoff)
 	params = ReplaceNumberByKey("ksBrushOverNoise", params, ksBrushOverNoise)
-	params = ReplaceNumberByKey("ksHardwallFitFraction", params, ksHardwallFitFraction)
+	params = ReplaceNumberByKey("ksDeflSens_ContactLen", params, ksDeflSens_ContactLen)
+	params = ReplaceNumberByKey("ksDeflSens_EdgeFraction", params, ksDeflSens_EdgeFraction)
+	params = ReplaceNumberByKey("ksFixDefl", params, ksFixDefl)
+	params = ReplaceNumberByKey("ksXDataZSens", params, ksXDataZSens)
+	params = ReplaceNumberByKey("ksMaxGoodPt", params, ksMaxGoodPt)
+	
 	
 	// Create 2d waves for Analysis
 	Make/N=(ksFCPoints, numcurves)/O fc_blfit = NaN
