@@ -707,69 +707,307 @@ End
 // and single curves (defl + friction) based on marker point in the cross-section plot
 Function PlotXsectFC()
 	WAVE brushheights, fc_z, fc, fc_fric, fc_x_tsd
+	WAVE rfc, rfc_fric, rfc_x_tsd
 	
 	Display/T brushheights,fc_z
-	AppendToGraph/L=fc fc[][0]
-	AppendToGraph/R fc_fric[][0]
-	AppendToGraph/L=fc fc[][0]/TN=fc_tsd vs fc_x_tsd[][0]
+	String name = MakeGraphName("xsect")
+	DoWindow/C $name
+	AppendToGraph/L=fc fc[][0], rfc[][0]
+	AppendToGraph/L=fric fc_fric[][0], rfc_fric[][0]
+	
+	String/G :internalvars:resultgraph=name
+	
+	ModifyGraph width=450, height=400
+	DoUpdate
+	ModifyGraph width=0, height=0
 	
 	ModifyGraph rgb(brushheights)=(65280,0,0), rgb(fc_z)=(0,0,0)
-	ModifyGraph rgb(fc)=(0,15872,65280), rgb(fc_fric)=(65280,0,0), rgb(fc_tsd)=(0,0,0)
+	ModifyGraph rgb(fc)=(0,15872,65280), rgb(rfc)=(65280,0,0)
+	ModifyGraph rgb(fc_fric)=(0,15872,65280), rgb(rfc_fric)=(65280,0,0)
+	
+	ModifyGraph mode(fc)=3,marker(fc)=19,msize(fc)=1,mrkThick(fc)=0
+	ModifyGraph mode(rfc)=3,marker(rfc)=19,msize(rfc)=1,mrkThick(rfc)=0
+	//ModifyGraph mode(fc_fric)=3,marker(fc_fric)=19,msize(fc_fric)=1,mrkThick(fc_fric)=0
+	//ModifyGraph mode(rfc_fric)=3,marker(rfc_fric)=19,msize(rfc_fric)=1,mrkThick(rfc_fric)=0
+	
 	ModifyGraph useNegRGB(brushheights)=1, negRGB(brushheights)=(32768,54528,65280)
-	
 	ModifyGraph mode(brushheights)=7, hbFill(brushheights)=2, toMode(brushheights)=2, lsize(brushheights)=0
-	//ModifyGraph offset(fc_fric)={0,300}, muloffset(fc_fric)={0,3000}
-	ModifyGraph offset(fc_tsd)={30,0}
-	ModifyGraph standoff=0, zero(left)=1
-	ModifyGraph freePos(fc)={0,kwFraction}
-	ModifyGraph freePos(right)={0,kwFraction}
-	ModifyGraph axisEnab(left)={0.65,1}
-	ModifyGraph axisEnab(fc)={0,0.6}
-	ModifyGraph axisEnab(right)={0,0.6}
+	ModifyGraph standoff=0, zero(left)=1, zero(fc)=4
+	ModifyGraph freePos(fc)={0,kwFraction}, freePos(fric)={0,kwFraction}
+	ModifyGraph axisEnab(left)={.75,1}
+	ModifyGraph axisEnab(fc)={.38,.72}, axisEnab(fric)={0,.34}
 	
-	SetAxis bottom 0,100
+	PlotXsectFC_setzoom()
 	
-	String text = "FC: 0"
-	TextBox/C/N=fcinfobox/A=RC text
+	String text = "\Zr080FC: 0"
+	TextBox/C/N=fcinfobox/A=RT/E=2 text
+	
+	PutDFNameOnGraph()
 	
 	ShowInfo
 	
+	Cursor/P A, fc_z, 0
+	
+	ControlBar/T 30
+	SetWindow kwTopwin, userdata=("xmode:zpiezo;index:0")
+	Button modeswitchb, title="X:  Zpiezo", size={70,25}, pos={20,2}, proc=PlotXsectFC_switchmode
+	Button zoomb, title="Unzoom", size={70,25}, pos={100,2}, proc=PlotXsectFC_zoomb
+	
 	SetWindow kwTopWin, hook(xsectcursor)=PlotXsectFC_movecursor
+	PlotXsectFC_replaceFC("zpiezo", 0)
 End
+
+
+// Sets zoom to "good"/useful values.
+Function PlotXsectFC_setzoom()
+	
+	Variable ymin_topo = -5
+	
+//	Variable xmax = 100
+//	Variable xmin = -5
+//	
+//	Variable ymin_fc = -1000
+	
+	WAVE zoom = GetZoom(1, 4)
+	Variable ymin_fc = zoom[0]
+	Variable xmin_fc = zoom[2]
+	Variable xmax_fc = zoom[3]
+	
+	SetAxis/A top
+	SetAxis left, ymin_topo, *
+	SetAxis bottom, xmin_fc, xmax_fc
+	SetAxis/A=2 fc, ymin_fc, *
+	SetAxis/A=2 fric
+End
+
+
+Function PlotXsectFC_zoomb(cname)
+	String cname
+	
+	if (cmpstr(cname, "zoomb") != 0)
+		return 0
+	endif
+	
+	PlotXsectFC_setzoom()
+	return 0
+End
+
+Function PlotXsectFC_switchmode(cname)
+	String cname
+	
+	if (cmpstr(cname, "modeswitchb") != 0)
+		return 0
+	endif
+
+	GetWindow kwTopWin, userdata
+	
+	String mode = StringByKey("xmode", S_Value)
+	
+	Variable pt = NumberByKey("POINT", CsrInfo(A))
+	
+	if (numtype(pt) != 0)
+		pt = 0
+	endif
+	
+	WAVE fc, fc_fric, fc_x_tsd
+	WAVE rfc, rfc_fric, rfc_x_tsd
+	
+	strswitch(mode)
+		case "zpiezo":
+			// Replace Z-piezo with tip-sample-distance
+			SetWindow kwTopWin, userdata=(ReplaceStringByKey("xmode", S_Value, "tsd"))
+			Button modeswitchb,title="X:  TSD"
+			PlotXsectFC_replaceFC("tsd", pt)
+			break
+		case "tsd":
+			// Replace Z-piezo with tip-sample-distance
+			SetWindow kwTopWin, userdata=(ReplaceStringByKey("xmode", S_Value, "zpiezo"))
+			Button modeswitchb,title="X:  Zpiezo"
+			PlotXsectFC_replaceFC("zpiezo", pt)			
+			break
+	endswitch
+
+	return 0
+End
+
+
+Function PlotXsectFC_replaceFC(mode, pt)
+	String mode		// mode can be: "zpiezo", or "tsd"
+	Variable pt		// curve number to display
+	
+	WAVE fc, fc_fric, fc_x_tsd
+	WAVE rfc, rfc_fric, rfc_x_tsd
+	WAVE/T fcmeta
+	
+	DrawAction delete
+	
+	strswitch(mode)
+		case "zpiezo":
+			ReplaceWave trace=fc, fc[][pt]
+			ReplaceWave/X trace=fc, $""
+			ReplaceWave trace=rfc, rfc[][pt]
+			ReplaceWave/X trace=rfc, $""
+			
+			ReplaceWave trace=fc_fric, fc_fric[][pt]
+			ReplaceWave/X trace=fc_fric, $""
+			ReplaceWave trace=rfc_fric, rfc_fric[][pt]
+			ReplaceWave/X trace=rfc_fric, $""
+			
+			
+			WAVE/Z relstiffness_loz, relstiffness_hiz
+			if (WaveExists(relstiffness_loz) && WaveExists(relstiffness_hiz))
+				Variable rel_lo = relstiffness_loz[pt]
+				Variable rel_hi = relstiffness_hiz[pt]
+				SetDrawEnv ycoord=prel, xcoord=bottom, linefgc=(20000,20000,20000)
+				DrawLine rel_lo,0.25, rel_lo,1.03
+				SetDrawEnv ycoord=prel, xcoord=bottom, linefgc=(20000,20000,20000)
+				DrawLine rel_hi,0.25, rel_hi,1.03
+			endif
+			
+			break
+			
+		case "tsd":
+			ReplaceWave trace=fc, fc[][pt]
+			ReplaceWave/X trace=fc, fc_x_tsd[][pt]
+			ReplaceWave trace=rfc, rfc[][pt]
+			ReplaceWave/X trace=rfc, rfc_x_tsd[][pt]
+			
+			ReplaceWave trace=fc_fric, fc_fric[][pt]
+			ReplaceWave/X trace=fc_fric, fc_x_tsd[][pt]
+			ReplaceWave trace=rfc_fric, rfc_fric[][pt]
+			ReplaceWave/X trace=rfc_fric, rfc_x_tsd[][pt]
+			
+			
+			WAVE/Z fc_emodfit
+			if (WaveExists(fc_emodfit))
+				if (strsearch(TraceNameList("", ";", 1), "fc_emodfit", 0) == -1)
+					// did not find trace name
+					AppendToGraph/L=fc fc_emodfit[][pt] vs fc_x_tsd[][pt]
+					ModifyGraph lsize(fc_emodfit)=1.5,rgb(fc_emodfit)=(52224,52224,0)
+				else
+					ReplaceWave trace=fc_emodfit, fc_emodfit[][pt]
+					ReplaceWave/X trace=fc_emodfit, fc_x_tsd[][pt]
+				endif
+			endif
+			
+//			WAVE/Z fc_emod2fit, emod2
+//			if (WaveExists(emod2) && emod2[pt])
+//				if (strsearch(TraceNameList("", ";", 1), "fc_emod2fit", 0) == -1)
+//					// did not find trace name
+//					AppendToGraph/L=fc fc_emod2fit[][pt] vs fc_x_tsd[][pt]
+//					ModifyGraph lsize(fc_emod2fit)=1.5,rgb(fc_emod2fit)=(26112,26112,0)
+//				else
+//					ReplaceWave trace=fc_emod2fit, fc_emod2fit[][pt]
+//					ReplaceWave/X trace=fc_emod2fit, fc_x_tsd[][pt]
+//				endif
+//			endif
+			
+			WAVE/Z brushheights
+			if (WaveExists(brushheights) && brushheights[pt])	
+				SetDrawEnv xcoord=bottom, ycoord=prel, dash=11
+				DrawLine brushheights[pt],0.25, brushheights[pt],1.03
+				
+//				Variable hwx = fc_x_tsd[NumberByKey("HardwallPt", fcmeta[pt])][pt]
+//				Variable splitx = brushheights[pt] - hwx
+//				splitx = hwx + splitx * NumberByKey("EModSplitFraction", fcmeta[pt])
+//				
+//				SetDrawEnv xcoord=bottom, ycoord=prel, dash=11
+//				DrawLine hwx,0.25, hwx,1.03
+//				SetDrawEnv xcoord=bottom, ycoord=prel, dash=11
+//				DrawLine splitx,0.25, splitx,1.03
+			endif
+			
+			WAVE/Z linstiffness_loz, linstiffness_hiz
+			if (WaveExists(linstiffness_loz) && WaveExists(linstiffness_hiz))
+				Variable lin_lo = linstiffness_loz[pt]
+				Variable lin_hi = linstiffness_hiz[pt]
+				SetDrawEnv ycoord=prel, xcoord=bottom, linefgc=(20000,20000,20000)
+				DrawLine lin_lo,0.25, lin_lo,1.03
+				SetDrawEnv ycoord=prel, xcoord=bottom, linefgc=(20000,20000,20000)
+				DrawLine lin_hi,0.25, lin_hi,1.03
+			endif
+			
+			break
+	endswitch
+	
+	GetWindow kwTopWin, userdata
+	SetWindow kwTopWin, userdata=ReplaceNumberByKey("index", S_Value, pt)
+End
+
 
 Function PlotXsectFC_movecursor(s)
 	STRUCT WMWInHookStruct &s
 	
-	if (s.eventcode != 7)
-		return 0
-	endif
+	Variable retval = 0
 	
-	// eventcode 7 = cursormoved
+	GetWindow kwTopWin, userdata
+	String mode = StringByKey("xmode", S_Value)
 	
-	if (cmpstr(s.traceName, "brushheights") == 0 || cmpstr(s.traceName, "fc_z") == 0)
-		Variable pt = s.pointNumber
-		
-		WAVE fc, fc_fric, fc_x_tsd
-		
-		ReplaceWave trace=fc, fc[][pt]
-		ReplaceWave trace=fc_fric, fc_fric[][pt]
-		ReplaceWave trace=fc_tsd, fc[][pt]
-		ReplaceWave/X trace=fc_tsd, fc_x_tsd[][pt]
-		
-		String text = "FC: " + num2str(pt)
-		TextBox/C/N=fcinfobox text
-		
-		return 1
-	endif
+	switch (s.eventcode)
+		case 7:	// cursormoved (data cursor)
+			if (WhichListItem(s.traceName, "brushheights;fc_z;relstiffness;relstiffness_fric") >= 0)
+				Variable pt = s.pointNumber
+				
+				WAVE fc, fc_fric, fc_x_tsd
+				WAVE rfc, rfc_fric, rfc_x_tsd
+				WAVE deflsensfit
+				
+				PlotXsectFC_replaceFC(mode, pt)
+				
+				String text = "\Zr080FC: " + num2str(pt) + "\rDeflsens: " + num2str(deflsensfit[pt])
+				TextBox/C/N=fcinfobox text
+				
+				PlotXsectFC_setzoom()
+				
+				retval = 1
+			endif
+			break
+			
+		case 4:	// mousemoved
+			
+			if (s.eventMod & 2)
+				// On holding shift
+				// Draw cursor B on graph to get x/y infos in the ShowInfo box
+				// Also draw a vertical line to see which points lay above each other
+				String trinfo = TraceFromPixel(s.mouseLoc.h, s.mouseLoc.v, "DELTAX:3;DELTAY:3")
+				String trname = StringByKey("TRACE", trinfo)
+				Variable trpt = NumberByKey("HITPOINT", trinfo)
+				
+				if (cmpstr(trname, "") == 0 || cmpstr(trname, "fc_z") == 0 || cmpstr(trname, "brushheights") == 0)
+					break
+				endif
+				
+				Cursor/H=0/S=2/A=0/P B, $trname, trpt
+				Variable xpos = 0
+				
+				strswitch(mode)
+					case "zpiezo":
+						xpos = pnt2x($trname, trpt)
+						break
+					case "tsd":
+						if (stringmatch(trname, "fc*"))
+							WAVE wtsd = $"fc_x_tsd"
+						else
+							WAVE wtsd = $"rfc_x_tsd"
+						endif
+						Variable fcpt = NumberByKey("POINT", CsrInfo(A))
+						xpos = wtsd[trpt][fcpt]
+						break
+				endswitch
+				
+				DrawAction delete
+				SetDrawEnv ycoord=prel, xcoord=bottom
+				DrawLine xpos,0.25, xpos,1.03
+			endif
+			break
+			
+	endswitch
 	
+	return retval	
 End
 
 
-// Print the name of the data folder onto the graph
-// If a graph is in front, use the data folder of the first trace/image
-// Otherwise use current data folder
-Function PutDFNameOnGraph()
-	String df
+
 // If a graph is in front, return the data folder of the first trace/image
 // Otherwise return current data folder
 Function/S GetGraphDF()
