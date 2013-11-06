@@ -277,10 +277,9 @@ End
 Function PlotFC(index)
 	Variable index
 	
+	Display
 	String name = MakeGraphName("fc" + num2str(index) + "_plot")
-	Display/N=$name/K=1
-	
-	PlotFC_plotdata(index)
+	DoWindow/C $name
 	
 	PutDFNameOnGraph()
 
@@ -294,8 +293,25 @@ Function PlotFC(index)
 	
 	// Buttons for showing and hiding curves
 	// Save in userdata whether curve is shown at the moment
-	Button showapproach,title="Hide approach",size={80,20},userdata="1",proc=PlotFC_showcurves
-	Button showretract,title="Show retract",size={80,20},userdata="0",proc=PlotFC_showcurves
+	// Default (i.e. on first curve): show approach, hide retract
+	Button showapproachb,title="Hide approach",size={80,20},proc=PlotFC_showcurves
+	Button showretractb,title="Show retract",size={80,20},proc=PlotFC_showcurves	
+	GetWindow kwTopWin, userdata
+	String winUserdata = S_Value
+	winUserdata = ReplaceNumberByKey("approach", winUserdata, 1)
+	winUserdata = ReplaceNumberByKey("retract", winUserdata, 0)
+	
+	// X axis type:
+	// 1: tip-sample distance
+	// 2: Z piezo position
+	Button xtypeb,title="X: TSD",size={60,20},proc=PlotFC_switchx
+	winUserdata = ReplaceNumberByKey("xtype", winUserdata, 1)
+	
+	Button printmetab,title="Metadata",size={55,20},proc=PlotFC_printmeta
+	
+	SetWindow kwTopWin, userdata=winUserdata
+	
+	PlotFC_plotdata(index)
 	
 	SetWindow kwTopWin,hook(fcnavigate)=PlotFC_navigate
 End
@@ -303,15 +319,27 @@ End
 
 Function PlotFC_plotdata(index)
 	Variable index		// force curve number to plot
-
 	
-	// Somewhat of a temporary "hack" to switch off parts of code
-	// mode==0, draw all parts
-	// mode==1, draw only raw curve and remove brush height info
+	NVAR numcurves = :internalvars:numCurves
+	
+	if (index < 0 || index >= numcurves)
+		return -1
+	endif
+	
+	// Somewhat of a "hack" to switch on/off parts of elements on graph
 	Variable mode = 1
 	
+	GetWindow kwTopWin, userdata
+	String winUserdata = S_Value
+	Variable showapproach = NumberByKey("approach", winUserdata)
+	Variable showretract = NumberByKey("retract", winUserdata)
+	Variable zoomlvl = NumberByKey("zoomlvl", winUserdata)
+	Variable xtype = NumberByKey("xtype", winUserdata)
 	
-	WAVE fc, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
+	showapproach = (numtype(showapproach) > 0) ? 1 : showapproach
+	showretract = (numtype(showretract) > 0) ? 0 : showretract
+	zoomlvl = (numtype(zoomlvl) > 0) ? 1 : zoomlvl
+	xtype = (numtype(xtype) > 0) ? 1 : xtype
 	
 	// Remove all previous traces
 	Variable numtraces = ItemsInList(TraceNameList("", ";", 1))
@@ -321,102 +349,126 @@ Function PlotFC_plotdata(index)
 		RemoveFromGraph $"#0"		// remove the currently first trace, others shift up
 	endfor
 	
-	AppendToGraph fc[][index] vs fc_x_tsd[][index]
-
-	if (fc_expfit[0][index])
-		AppendToGraph fc_expfit[][index]
-	elseif (fc_smth[0][index])
-		if (mode==0)
-			AppendToGraph fc_smth[][index] vs fc_smth_xtsd[][index]
+	Variable tracenum = 0
+	
+	if (showapproach)
+		WAVE fc, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
+		AppendToGraph fc[][index]
+		if (xtype == 1)
+			ReplaceWave/X trace=fc, fc_x_tsd[][index]
+		endif
+		if (mode == 0)
+			if (fc_expfit[0][index] && xtype == 1)
+				AppendToGraph fc_expfit[][index]
+			elseif (fc_smth[0][index])
+				AppendToGraph fc_smth[][index]
+				if (xtype == 1)
+					ReplaceWave/X trace=fc_smth, fc_smth_xtsd[][index]
+				endif
+			endif
+		endif
+		ModifyGraph rgb[tracenum]=(0,15872,65280)
+		tracenum += 1
+		
+		// Color 2nd trace if present
+		if (ItemsInList(TraceNameList("", ";", 1)) > tracenum)
+			ModifyGraph rgb[tracenum]=(65280,0,0)
+			tracenum += 1
 		endif
 	endif
-
-	ModifyGraph rgb[0]=(0,15872,65280)
 	
-	// Sometimes no second trace (if curve could not be analysed e.g.)
-	if (ItemsInList(TraceNameList("", ";", 1)) > 1)
-		ModifyGraph rgb[1]=(65280,0,0)
+	if (showretract)
+		WAVE rfc, rfc_x_tsd
+		AppendToGraph rfc[][index]
+		if (xtype == 1)
+			ReplaceWave/X trace=rfc, rfc_x_tsd[][index]
+		endif
+		ModifyGraph rgb[tracenum]=(0,52224,0)
+		tracenum += 1
 	endif
 	
-
+	ModifyGraph marker=19,msize=1,mrkThick=0,mode=3
 	ModifyGraph nticks(bottom)=10,minor(bottom)=1,sep=10,fSize=12,tickUnit=1
 	Label left "\\Z13force (pN)"
-	Label bottom "\\Z13tip-sample distance (nm)"
+	if (xtype == 1)
+		Label bottom "\\Z13tip-sample distance (nm)"
+	elseif (xtype == 2)
+		Label bottom "\\Z13Z piezo (nm)"
+	endif
 	ModifyGraph zero=8
 	
-	Variable zoomlvl = 1
 	PlotFC_setzoom(zoomlvl)	
 	
 	WAVE brushheights
 	NVAR rowsize = :internalvars:FVRowSize
+	SVAR iwavename = :internalvars:imagewave
+	WAVE iwave = $iwavename
 	
-	String text="", text2=""
-	text = "FC: " + num2str(index) + ";   X: " + num2str(mod(index,rowsize))
-	text += "; Y:" + num2str(floor(index/rowsize))
+	String text=""
+	sprintf text, "FC: %d;   X: %d; Y: %d", index, mod(index,rowsize), floor(index/rowsize)
+	sprintf text, "%s\rTopo: %.1f nm", text, iwave[index]
 
-	if (mode==0)
-		sprintf text2, "\rBrush height: %.2f nm", brushheights[index]
-	endif
-	TextBox/C/N=fcinfobox/A=RT (text + text2)
+//	if (mode==0)
+		sprintf text, "%s\rBrush height: %.2f nm", text, brushheights[index]
+//	endif
+	TextBox/C/N=fcinfobox/A=RT (text)
 	
 	// Draw drop-line at brush height
-	if (brushheights[index])
-		DrawAction delete
+	DrawAction delete
+	if (mode==0 && brushheights[index])		
 		SetDrawEnv xcoord=bottom, ycoord=prel, dash=11
-		if (mode==0)
-			DrawLine brushheights[index],0.3, brushheights[index],1.05
-		endif
+		DrawLine brushheights[index],0.3, brushheights[index],1.05
 	endif
 	
 	// Put curve index and zoom level into window userdata
-	String udata = ""
-	sprintf udata, "index:%d;zoomlvl:%d;", index, zoomlvl
-	SetWindow kwTopWin, userdata=udata
+	winUserdata = ReplaceNumberByKey("index", winUserdata, index)
+	winUserdata = ReplaceNumberByKey("zoomlvl", winUserdata, zoomlvl)
+	winUserdata = ReplaceNumberByKey("mode", winUserData, mode)
+	SetWindow kwTopWin, userdata=winUserdata
 End
 
 
 Function PlotFC_navigate(s)
 	STRUCT WMWinHookStruct &s
 	
-	Variable defZoom = 1
-	
 	Variable ret = 0
 	
 	// keyboard events with ctrl pressed
 	if (s.eventCode == 11 && s.eventmod == 8)
+		NVAR rowsize = :internalvars:FVRowSize
+		NVAR numcurves = :internalvars:numCurves
 		GetWindow kwTopWin, userdata
 		Variable index = NumberByKey("index", S_Value)
 		switch (s.keycode)
 			case 28:		// left arrow
 				index -= 1
-				PlotFC_plotdata(index)
 				ret = 1
 				break
 			
 			case 29:		// right arrow
 				index += 1
-				PlotFC_plotdata(index)
 				ret = 1
 				break
 				
 			case 30:		// up arrow
-				index += 32
-				PlotFC_plotdata(index)
+				index += rowsize
 				ret = 1
 				break
 				
 			case 31:		// down arrow
-				index -= 32
-				PlotFC_plotdata(index)
+				index -= rowsize
 				ret = 1
 				break
 		endswitch
 	endif
 	
-	// if updated plot, set default zoom level and redraw markers on the images
+	if (index < 0 || index >= numcurves)
+		ret = 0
+	endif
+	
+	// if updated index, update plot and redraw markers on the images
 	if (ret == 1)
-		PlotFC_setzoom(defZoom)
-		
+		PlotFC_plotdata(index)
 		NVAR rowsize = :internalvars:FVRowSize
 		SVAR imagegraph = :internalvars:imagegraph
 		SVAR resultgraph = :internalvars:resultgraph
@@ -466,76 +518,188 @@ Function PlotFC_showcurves(cname) : ButtonControl
 	
 	// Get fc number
 	GetWindow kwTopWin, userdata
-	Variable index = NumberByKey("index", S_Value)
+	String winUserdata = S_Value
+	Variable index = NumberByKey("index", winUserdata)
+	Variable showapproach = NumberByKey("approach", winUserdata)
+	Variable showretract = NumberByKey("retract", winUserdata)
+	Variable mode = NumberByKey("mode", winUserdata)
+	Variable xtype = NumberByKey("xtype", winUserdata)
 	
 	if (numtype(index) != 0)
 		// Not a normal number, do nothing, since we don't know what curve we have
 		return -1
 	endif
 	
-	Variable trace
+	Variable trace = 0
+	Variable newtracenum = 0
 	
 	strswitch (cname)
-		case "showapproach":
-			if (str2num(S_UserData) == 1)
+		case "showapproachb":
+			if (showapproach)
 				// Hide approach graph
 					RemoveFromGraph/Z fc, fc_smth, fc_expfit
-					Button showapproach,title="Show approach",userdata="0"
+					Button showapproachb,title="Show approach"
+					winUserdata = ReplaceNumberByKey("approach", winUserdata, 0)
 			else
 				// Show approach graph
 					WAVE fc, fc_x_tsd, fc_smth, fc_smth_xtsd
-					AppendToGraph fc[][index] vs fc_x_tsd[][index]
-					AppendToGraph fc_smth[][index] vs fc_smth_xtsd[][index]
 					
-					trace = ItemsInList(TraceNameList("", ";", 1)) - 2
+					AppendToGraph fc[][index]
+					newtracenum += 1
+					if (xtype == 1)
+						ReplaceWave/X trace=fc, fc_x_tsd[][index]
+					endif
+					if (mode == 0)
+						AppendToGraph fc_smth[][index]
+						newtracenum += 1
+						if (xtype == 1)
+							ReplaceWave/X trace=fc_smth, fc_smth_xtsd[][index]
+						endif
+					endif
+					
+					trace = ItemsInList(TraceNameList("", ";", 1)) - newtracenum
 					ModifyGraph rgb[trace]=(0,15872,65280)
-					ModifyGraph rgb[trace+1]=(65280,0,0)
+					if (mode == 0)
+						ModifyGraph rgb[trace+1]=(65280,0,0)
+					endif
 					
-					Button showapproach,title="Hide approach",userdata="1"
+					Button showapproachb,title="Hide approach"
+					winUserdata = ReplaceNumberByKey("approach", winUserdata, 1)
 			endif
 			break
 		
-		case "showretract":
-			if (str2num(S_UserData) == 1)
+		case "showretractb":
+			if (showretract)
 				// Hide retract graph
 					RemoveFromGraph/Z rfc
-					Button showretract,title="Show retract",userdata="0"
+					Button showretractb,title="Show retract"
+					winUserdata = ReplaceNumberByKey("retract", winUserdata, 0)
 			else
 				// Show retract graph
 					WAVE rfc, rfc_x_tsd
-					AppendToGraph rfc[][index] vs rfc_x_tsd[][index]
+					AppendToGraph rfc[][index]
+					if (xtype == 1)
+						ReplaceWave/X trace=rfc, rfc_x_tsd[][index]
+					endif
 					
 					trace = ItemsInList(TraceNameList("", ";", 1)) - 1
 					ModifyGraph rgb[trace]=(0,52224,0)
 					
-					Button showretract,title="Hide retract",userdata="1"
+					Button showretractb,title="Hide retract"
+					winUserdata = ReplaceNumberByKey("retract", winUserdata, 1)
 			endif
 			break
 			
 	endswitch
+	
+	ModifyGraph marker=19,msize=1,mrkThick=0,mode=3
+	
+	SetWindow kwTopWin, userdata=winUserdata
+End
+
+
+Function PlotFC_switchx(cname) : ButtonControl
+	String cname
+	
+	// Get window metadata
+	GetWindow kwTopWin, userdata
+	String winUserdata = S_Value
+	Variable index = NumberByKey("index", winUserdata)
+	Variable showapproach = NumberByKey("approach", winUserdata)
+	Variable showretract = NumberByKey("retract", winUserdata)
+	Variable mode = NumberByKey("mode", winUserdata)
+	Variable xtype = NumberByKey("xtype", winUserdata)
+	
+	if (numtype(index) != 0)
+		// Not a normal number, do nothing, since we don't know what curve we have
+		return -1
+	endif
+	
+	switch (xtype)
+		case 1:	// TSD -> switch to Zpiezo
+			if (showapproach)
+				ReplaceWave/X trace=fc, $""
+				if (mode == 0)
+					ReplaceWave/X trace=fc_smth, $""
+				endif
+			endif
+			if (showretract)
+				ReplaceWave/X trace=rfc, $""
+			endif
+			xtype = 2
+			Button xtypeb,title="X: Zpiezo"
+			Label bottom "\\Z13Z piezo (nm)"
+			break
+			
+		case 2:	// Zpiezo -> switch to TSD
+			WAVE fc_x_tsd, fc_smth_xtsd, rfc_x_tsd
+			if (showapproach)
+				ReplaceWave/X trace=fc, fc_x_tsd[][index]
+				if (mode == 0)
+					ReplaceWave/X trace=fc_smth, fc_smth_xtsd[][index]
+				endif
+			endif
+			if (showretract)
+				ReplaceWave/X trace=rfc, rfc_x_tsd[][index]
+			endif
+			xtype = 1
+			Button xtypeb,title="X: TSD"
+			Label bottom "\\Z13tip-sample distance (nm)"
+			break
+	endswitch
+	
+	winUserdata = ReplaceNumberByKey("xtype", winUserdata, xtype)
+	SetWindow kwTopWin, userdata=winUserdata
+	
+	Variable zoomlvl = NumberByKey("zoomlvl", winUserdata)
+	PlotFC_setzoom(zoomlvl)
+	
+	return 0
+End
+
+
+Function PlotFC_printmeta(cname) : ButtonControl
+	String cname
+	
+	WAVE/T fcmeta
+	WAVE brushheights
+	GetWindow kwTopWin, userdata
+	Variable i = NumberByKey("index", S_Value)
+	String s = ""
+	sprintf s, "FC %d; Brushheight: %.1f;  %s", i, brushheights[i], fcmeta[i]
+	print s
+	
+	return 0
 End
 
 
 Function PlotFC_setzoom(level)
 	Variable level
 	
-	switch (level)
-		case 0:
-			SetAxis/A
-			break
-		case 1:
-			SetAxis/A left
-			SetAxis bottom -5, 80
-			break
-		case 2:
-			SetAxis left -35,250
-			SetAxis bottom -5,120
-			break
-		case 3:
-			SetAxis left -35,150
-			SetAxis bottom -5,75
-			break
-	endswitch
+	GetWindow kwTopWin, userdata
+	Variable xtype = NumberByKey("xtype", S_Value)
+	
+	WAVE zoom = GetZoom(xtype, level)
+	
+	Variable leftmin = zoom[0]
+	Variable leftmax = zoom[1]
+	Variable bottmin = zoom[2]
+	Variable bottmax = zoom[3]
+	
+	if (numtype(leftmin) > 0)
+		SetAxis/A left
+	else
+		SetAxis left, leftmin, leftmax
+	endif
+	if (numtype(bottmin) > 0)
+		SetAxis/A bottom
+	else
+		SetAxis bottom, bottmin, bottmax
+	endif
+	
+	SetWindow kwTopWin, userdata=(ReplaceNumberByKey("zoomlvl", S_Value, level))
+	
+	return 0
 End
 
 
