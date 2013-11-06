@@ -144,36 +144,11 @@ Function SetSettings(flags)
 	Variable/G :internalvars:loadFriction = (cmpstr(fricStr, "Yes") == 0) ? 1 : 0
 	Variable/G :internalvars:loadZSens = (cmpstr(zsensStr, "Yes") == 0) ? 1 : 0
 	
-End
-
-
-
 	NVAR/Z isdataloaded = :internalvars:isDataLoaded
 	if (!NVAR_Exists(isdataloaded))
 		Variable/G :internalvars:isDataLoaded = 0
 	endif
 	
-Function PrintInfo()
-	SVAR ig = :internalvars:imagegraph
-	SVAR iw = :internalvars:imagewave
-	SVAR rg = :internalvars:resultgraph
-	SVAR rw = :internalvars:resultwave
-	SVAR sel = :internalvars:selectionwave
-	SVAR path = :internalvars:totalpath
-	SVAR params = :internalvars:analysisparameters
-	printf "IMAGE graph: %s,  wave: %s\r", ig, iw
-	printf "BRUSHHEIGHTS graph: %s,  wave: %s\r", rg, rw
-	printf "selectionwave: %s,  totalpath: %s\r", sel, path
-	printf "analysis parameters: %s\r", params
-End
-
-Function PrintInfoDF(df)
-	String df		// data folder (without 'root:' part) to print info from
-	String fullDF = "root:" + df
-	String prevDF = GetDataFolder(1)
-	SetDataFolder fulldf
-	PrintInfo()
-	SetDataFolder prevDF
 End
 
 
@@ -191,59 +166,6 @@ Function CheckRoot()
 End
 
 
-// waves: StringList of wave names (";" as separator)
-// from, to: average wave range [from, to] (both inclusive)
-// wavg, wsd: waves for averaged values and standard deviations
-Function AvgWaves(waves, from, to, wavg, wsd)
-	String waves
-	Variable from, to
-	WAVE wavg, wsd
-	
-	if ((numpnts(wavg) < (to-from+1)) || (numpnts(wsd) < (to-from+1)))
-		Print "Target wave is not big enough"
-		return -1
-	endif
-	
-	Variable i = 0
-	String wname
-	Make/O/WAVE/FREE wlist
-	
-	do
-		wname = StringFromList(i, waves, ";")
-		if (strlen(wname) == 0)
-			break
-		endif
-		if (WaveExists($wname) == 0)
-			break
-		endif
-		
-		wlist[i] = $wname
-		i += 1
-		
-	while (1)
-	
-	Variable wnum = i
-	
-	Print num2str(wnum) + " input waves"
-	
-	Variable j
-	Variable k = 0
-	Make/N=(wnum)/FREE wrow
-	
-	for (i=from; i <= to; i+=1)
-		wrow = 0
-		for (j=0; j < wnum; j+=1)
-			WAVE w = wlist[j]
-			wrow[j] = w[i]
-		endfor
-		WaveStats/Q wrow
-		wavg[k] = V_avg
-		wsd[k] = V_sdev
-		k += 1
-	endfor
-	
-	return 0
-End
 
 
 

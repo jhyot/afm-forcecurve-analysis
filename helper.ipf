@@ -244,3 +244,429 @@ Function filterbydepth(from, to, depth, input, output)
 		endif
 	endfor	
 End
+
+// Create histogram of brush heights
+Function BrushHisto(binsize)
+	Variable binsize  // nm
+	Variable binmin = -5		// nm
+	
+	WAVE brushheights
+	Variable binmax = GetUpperPercentile(brushheights, 99)
+	// Round to upper decade
+	binmax = 10*ceil(binmax/10)
+	
+	Variable bins = ceil((binmax - binmin)/binsize)
+	Make/O/N=(bins) brushheights_histo = 0
+	WAVE brushheights_histo
+	Histogram/P/B={binmin, binsize, bins} brushheights, brushheights_histo
+	
+	Display brushheights_histo
+	String name = MakeGraphName("bhisto")
+	DoWindow/C $name
+	ModifyGraph mode=5, hbFill=2, useBarStrokeRGB=1
+	PutDFNameOnGraph()
+End
+
+
+// waves: StringList of wave names (";" as separator)
+// from, to: average wave range [from, to] (both inclusive)
+// wavg, wsd: waves for averaged values and standard deviations
+Function AvgWaves(waves, from, to, wavg, wsd)
+	String waves
+	Variable from, to
+	WAVE wavg, wsd
+	
+	if ((numpnts(wavg) < (to-from+1)) || (numpnts(wsd) < (to-from+1)))
+		Print "Target wave is not big enough"
+		return -1
+	endif
+	
+	Variable i = 0
+	String wname
+	Make/O/WAVE/FREE wlist
+	
+	do
+		wname = StringFromList(i, waves, ";")
+		if (strlen(wname) == 0)
+			break
+		endif
+		if (WaveExists($wname) == 0)
+			break
+		endif
+		
+		wlist[i] = $wname
+		i += 1
+		
+	while (1)
+	
+	Variable wnum = i
+	
+	Print num2str(wnum) + " input waves"
+	
+	Variable j
+	Variable k = 0
+	Make/N=(wnum)/FREE wrow
+	
+	for (i=from; i <= to; i+=1)
+		wrow = 0
+		for (j=0; j < wnum; j+=1)
+			WAVE w = wlist[j]
+			wrow[j] = w[i]
+		endfor
+		WaveStats/Q wrow
+		wavg[k] = V_avg
+		wsd[k] = V_sdev
+		k += 1
+	endfor
+	
+	return 0
+End
+
+
+Function PrintInfo()
+	String ig = StrVarOrDefault(":internalvars:imagegraph", "")
+	String iw = StrVarOrDefault(":internalvars:imagewave", "")
+	String rg = StrVarOrDefault(":internalvars:resultgraph", "")
+	String rw = StrVarOrDefault(":internalvars:resultwave", "")
+	String sel = StrVarOrDefault(":internalvars:selectionwave", "")
+	String path = StrVarOrDefault(":internalvars:totalpath", "")
+	String params = StrVarOrDefault(":internalvars:analysisparameters", "")
+	print "IMAGE graph: " + ig + ",  wave: " + iw
+	print "BRUSHHEIGHTS graph: " + rg + ",  wave: " + rw
+	print "selectionwave: " + sel + ",  totalpath: " + path
+	print "analysis parameters: " + params
+End
+
+Function PrintInfoDF(df)
+	String df		// data folder (without 'root:' part) to print info from
+	String fullDF = "root:" + df
+	DFREF prevDF = GetDataFolderDFR()
+	SetDataFolder fulldf
+	PrintInfo()
+	SetDataFolder prevDF
+End
+
+
+Function SubtractBaseline()
+	
+	if (cmpstr(CsrInfo(A), "") == 0)
+		String dataname = "fc_z"
+		Prompt dataname, "Data wave name"
+		DoPrompt "", dataname
+		WAVE/Z data = $dataname
+		if (!WaveExists(data))
+			print "Abort: No wave: " + dataname
+			return -1
+		endif
+	else
+		WAVE data = CsrWaveRef(A)
+	endif
+	
+	SaveBackupWave(NameOfWave(data), "baselinesubtr")
+	
+	Make/FREE/N=(numpnts(data)) mask = 1
+	
+	
+	// Check all cursors (A to J, ASCII 65-74)
+	// And exclude data between pairs of cursors
+	String cname1 = "", cname2 = ""
+	Variable pairs = 0
+	
+	Variable i = 0
+	for (i=65; i<=73; i+=2)
+		cname1 = num2char(i)
+		cname2 = num2char(i+1)
+		if (cmpstr(CsrInfo($cname1), "") != 0 && cmpstr(CsrInfo($cname2), "") != 0)
+			if (WaveRefsEqual(CsrWaveRef($cname1), data) && WaveRefsEqual(CsrWaveRef($cname2), data))
+				// Cursor pair exists and is on data wave
+				mask[pcsr($cname1), pcsr($cname2)] = 0
+				pairs += 1
+			endif
+		else
+			break
+		endif
+	endfor
+	
+	print "Baseline fitting, excluding " + num2str(pairs) + " regions."
+	CurveFit/Q line, data /M=mask
+	WAVE W_coef
+	data -= W_coef[0] + W_coef[1]*x
+	
+	return 0
+End
+
+
+Function SaveBackupWave(orig, suffix)
+	String orig		// original wave to be backed up (in current folder)
+	String suffix	// name for backed up wave with <orig>_<suffix> (automatically in backups subfolder)
+	
+	WAVE w = $orig
+	
+	NewDataFolder/O backups
+	String backname = NameOfWave(w) + "_" + suffix
+	Duplicate/O w, :backups:$backname
+End
+
+
+Function RestoreBackupWave(orig, suffix)
+	String orig		// orig wave name, will be restored into
+	String suffix	// suffix in backup folder
+	
+	String backupname = orig + "_" + suffix
+	
+	WAVE/Z backupw = :backups:$backupname
+	
+	if (!WaveExists(backupw))
+		print "Backup wave not found: " + backupname
+		return -1
+	endif
+	
+	Duplicate/O backupw, $orig
+End
+
+Function MakeTempCurve(name, orig, idx)
+	String name		// name of duplicated temp wave
+	String orig		// original wave (2D)
+	Variable idx		// curve index to duplicate; -1 if taken from graph
+	
+	if (idx < 0)
+		GetWindow kwTopWin, userdata
+		idx = NumberByKey("index", S_Value)
+	endif
+	
+	
+	WAVE fc = $orig
+	
+	WAVE/T fcmeta
+	
+	Duplicate/O/R=[][idx] fc, $name
+	WAVE dup = $name
+	Redimension/N=(numpnts(dup)) dup
+End
+
+
+// Takes section between markers A and B and does linear baseline
+// subtraction, and afterwards FFT on it.
+Function MakeCurveFFT(wname)
+	String wname		// name of wave from which to make FFT
+						// FFT is saved in wname_fft
+						// and the baseline subtracted wave in wname_tempfft.
+						// if empty, use first trace of top graph.
+	
+	if (strlen(wname) == 0)
+		WAVE wtemp1 = WaveRefIndexed("", 0, 1)
+		wname = WaveName("", 0, 1)
+		WAVE wtemp2 = $wname
+		if (!WaveRefsEqual(wtemp1, wtemp2))
+			print "Couldn't select wave (correct datafolder?)"
+			return -1
+		endif
+	endif
+	
+	
+	
+	WAVE w = $wname
+	Duplicate/O w, $(wname + "_linsub")
+	WAVE wtemp = $(wname + "_linsub")
+	
+	Redimension/N=(floor(pcsr(B)/2)*2 - floor(pcsr(A)/2)*2) wtemp
+	wtemp[] = w[p+floor(pcsr(A)/2)*2]
+	CurveFit/Q line, wtemp
+	WAVE W_coef
+	wtemp -= W_coef[0] + W_coef[1]*x
+	
+	FFT/MAGS/DEST=$(wname + "_fft") wtemp
+End
+
+
+// Measure oscillation frequency between two markers (A,B)
+Function oscfreq(reswave, curve, rrate)
+	String reswave		// results wave in root folder
+	String curve			// curve wave (2D wave)
+	Variable rrate			// ramp rate in Hz
+	
+	Variable makenew = 0
+	WAVE/Z freqs = $("root:" + reswave)
+	
+	if (WaveExists(freqs))
+		if (DimSize(freqs, 1) != 3)
+			DoAlert 1, "Result wave has incorrect form, overwrite?"
+			if (V_flag == 1)
+				makenew = 1
+			else
+				Abort
+			endif
+		endif
+	else
+		makenew = 1
+	endif
+	
+	if (makenew)
+		Make/N=(100,3)/O $("root:" + reswave) = NaN
+		WAVE freqs =  $("root:" + reswave)
+	endif
+	
+	Wavestats/Q/M=1/R=[0,DimSize(freqs,0)-1] freqs
+	Variable nextpt = V_npnts
+	if (nextpt >= DimSize(freqs,0))
+		// extend result wave because its full
+		Redimension/N=(DimSize(freqs,0)+50) freqs
+	endif
+	
+	
+	MakeTempCurve("fctemp", curve, -1)
+	
+	MakeCurveFFT("fctemp")
+	
+	GetWindow kwTopWin, userdata
+	Variable i = NumberByKey("index", S_Value)
+	
+	WAVE fctemp, fctemp_linsub, fctemp_fft
+	WAVE/T fcmeta
+	
+	Wavestats/Q/M=1 fctemp_fft
+	Variable osclength = 1/V_maxloc
+	
+	// osc. length in nm
+	freqs[nextpt][0] = osclength
+	// curve number
+	freqs[nextpt][1] = i
+	// osc freq in Hz
+	freqs[nextpt][2] = 2.0 * rrate * NumberByKey("rampsize", fcmeta[i]) / osclength
+	
+	// display fft and curve, and results table
+	DoWindow/F oscfftgra
+	if (V_flag == 0)
+		Display/L/B fctemp_fft
+		AppendToGraph/T/R fctemp_linsub
+		DoWindow/C oscfftgra
+		
+		ModifyGraph lsize(fctemp_fft)=1.5, rgb(fctemp_fft)=(0,0,0)
+		SetAxis bottom 0,0.7
+	else
+		ReplaceWave/W=oscfftgra allinCDF
+	endif
+	
+	DoWindow/F oscffttab
+	if (V_flag == 0)
+		Edit freqs
+		DoWindow/C oscffttab
+	endif
+End
+
+
+Function FilterOsc(rate)
+	Variable rate		// ramp rate in Hz
+	
+	NVAR fcpoints = :internalvars:FCNumPoints
+	NVAR numcurves = :internalvars:numCurves
+	
+	Variable samprate = rate * 2.0 * fcpoints
+	
+	Variable fir_center = 250	// Hz
+	Variable fir_width = 300		// Hz
+	Variable fir_eps = 1e-14
+	Variable fir_nmult = 2
+	
+	Variable fir_center_frac = fir_center / samprate
+	Variable fir_width_frac = fir_width / samprate
+	
+	WAVE fc, rfc, fc_x_tsd, rfc_x_tsd
+	WAVE/T fcmeta
+	Duplicate/O fc, fc_orig
+	Duplicate/O rfc, rfc_orig
+	Duplicate/O fc_x_tsd, fc_x_tsd_orig
+	Duplicate/O rfc_x_tsd, rfc_x_tsd_orig
+	
+	Variable i
+	Variable springc = 0
+	for (i=0; i < numcurves; i+=1)
+		Duplicate/FREE/O/R=[][i] fc, fctemp
+		FilterFIR/NMF={fir_center_frac, fir_width_frac, fir_eps, fir_nmult} fctemp
+		fc[][i] = fctemp[p]
+		// recalc tip-sample dist
+		Duplicate/FREE/O/R=[][i] fc, fctemp_xtsd
+		springc = NumberByKey("springConst", fcmeta[i])
+		fctemp /= springc * 1000
+		fctemp_xtsd = NumberByKey("rampSize", fcmeta[i])/fcpoints * p
+		fctemp_xtsd += fctemp
+		fc_x_tsd[][i] = fctemp_xtsd[p]
+		
+		// retraction curve same thing
+		Duplicate/FREE/O/R=[][i] rfc, fctemp
+		FilterFIR/NMF={fir_center_frac, fir_width_frac, fir_eps, fir_nmult} fctemp
+		rfc[][i] = fctemp[p]
+		Duplicate/FREE/O/R=[][i] rfc, fctemp_xtsd
+		fctemp /= springc * 1000
+		fctemp_xtsd = NumberByKey("rampSize", fcmeta[i])/fcpoints * p
+		fctemp_xtsd += fctemp
+		rfc_x_tsd[][i] = fctemp_xtsd[p]
+		
+		
+		Prog("Filtering", i, numcurves)
+	endfor
+	
+End
+
+
+// Shows parameters from different possible sources:
+// analysis params, fc metadata
+Function PrintParams(params, idx)
+	String params		// semicolon-separated list of parameters
+	Variable idx
+	
+	SVAR/Z aparams = :internalvars:analysisparameters
+	if (!SVAR_Exists(aparams))
+		aparams = ""
+	endif
+	
+	WAVE/Z/T fcmeta
+	
+	Variable i
+	String currparam = ""
+	String currres = ""
+	String out = ""
+	for (i=0; i < ItemsInList(params); i+=1)
+		out += "\r"
+		currparam = StringFromList(i, params)
+		currres = StringByKey(currparam, aparams)
+		
+		if (strlen(currres) > 0)
+			out += currparam + "[analysis]: " + currres
+			continue
+		endif
+		
+		if (WAVEExists(fcmeta) && idx >= 0)
+			currres = StringByKey(currparam, fcmeta[idx])
+		endif
+		
+		if (strlen(currres) > 0)
+			out += currparam + "[" + num2str(idx) + "]: " + currres
+			continue
+		endif	
+	endfor
+	
+	print out
+	
+//	String res = ""
+//	
+//	SVAR/Z aparams = :internalvars:analysisparameters
+//	if (SVAR_Exists(aparams))
+//		res = StringByKey(param, aparams)
+//	endif
+//	
+//	if (strlen(res) > 0)
+//		print param + ": " + res
+//	endif
+//	
+//	WAVE/Z/T fcmeta
+//	res = ""
+//	if (WAVEExists(fcmeta) && idx >= 0)
+//		res = StringByKey(param, fcmeta[idx])
+//	endif
+//	
+//	if (strlen(res) > 0)
+//		print param + "[" + num2str(idx) + "]: " + res
+//	endif
+	
+End
