@@ -154,8 +154,9 @@ End
 Function/S RecreateImage(img)
 	String img	// name of image wave to be displayed
 	
+	Display/W=(30,55,30+387,55+358)
 	String name = MakeGraphName("image")
-	Display/N=$name/W=(30,55,30+387,55+358)
+	DoWindow/C $name
 	AppendImage $img
 	ModifyImage $img ctab={*,*,Gold,0}
 	ModifyGraph width=300,height=300,margin(right)=90
@@ -165,7 +166,7 @@ Function/S RecreateImage(img)
 
 	DoUpdate
 	
-	return S_name	
+	return name
 End
 
 
@@ -173,11 +174,12 @@ End
 Function ShowResultMap()
 	SVAR resultwave = :internalvars:resultwave
 
+	Display/W=(30+430,55,30+387+430,55+358)
 	String name = MakeGraphName("result")
-	Display/N=$name/W=(30+430,55,30+387+430,55+358)
+	DoWindow/C $name
 	AppendImage $resultwave
 	
-	String/G :internalvars:resultgraph=S_name
+	String/G :internalvars:resultgraph = name
 	
 	// Scale range between 0 and 99th percentile of heights (ignore extreme outliers)
 	WAVE brushheights
@@ -533,6 +535,10 @@ End
 // Otherwise use current data folder
 Function PutDFNameOnGraph()
 	String df
+// If a graph is in front, return the data folder of the first trace/image
+// Otherwise return current data folder
+Function/S GetGraphDF()
+	String df = ""
 	
 	// Test if graph is an image
 	String imlist = ImageNameList("", ";")
@@ -542,16 +548,29 @@ Function PutDFNameOnGraph()
 		df = GetWavesDataFolder(w, 1)
 	else
 		// not an image, i.e. might be normal traces
-		WAVE/Z w = WaveRefIndexed("", 0, 3)
-		if (WaveExists(w))
-			df = GetWavesDataFolder(w, 1)
+		// check whether any window is on top
+		DoWindow kwTopWin
+		if (V_flag == 1)
+			WAVE/Z w = WaveRefIndexed("", 0, 3)
+			if (WaveExists(w))
+				df = GetWavesDataFolder(w, 1)
+			else
+				// didn't find image or normal traces, just use current data folder
+				df = GetDataFolder(1)
+			endif
 		else
-			// didn't find image or normal traces, just use current data folder
+			// no window displayed, use current data folder
 			df = GetDataFolder(1)
 		endif
 	endif
 	
-	df = TidyDFName(df)
+	return df
+End
+
+
+// Print the name of the data folder onto the graph
+Function PutDFNameOnGraph()
+	String df = TidyDFName(GetGraphDF())
 	TextBox/C/N=dfname/F=0/A=LB/X=.5/Y=.1/E=2 "\\Zr085" + df
 End
 
@@ -569,17 +588,43 @@ Function/S TidyDFName(df)
 	return df
 End
 
-// Makes and returns graph name like:
+// Returns graph name like:
 // <datafolder>_<suffix>
 Function/S MakeGraphName(suffix)
 	String suffix
 	
-	String name = TidyDFName(GetDataFolder(1))
+	String name = TidyDFName(GetGraphDF())
 	name = ReplaceString(":", name, "_")
 	
 	name = name + "_" + suffix
+
+	DoWindow $name
+	if (V_flag > 0)
+		// Window name in use, look for unused one
+		Variable n = 0
+		name = name + "0"
+		do
+			DoWindow $name
+			if (V_Flag == 0)
+				break
+			endif
+			
+			n += 1
+			name = name[0, strlen(name)-strlen(num2str(n-1))-1] + num2str(n)
+		while (1)
+	endif
 	
 	return name
+End
+
+// Renames top graph with to <datafolder>_<suffix>
+Function RenameGraph(suffix)
+	String suffix
+	
+	String name = MakeGraphName(suffix)
+	DoWindow/C $name
+	
+	return 0
 End
 
 
