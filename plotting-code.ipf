@@ -183,10 +183,7 @@ Function ShowResultMap()
 	
 	// Scale range between 0 and 99th percentile of heights (ignore extreme outliers)
 	WAVE brushheights
-	Duplicate/O brushheights, brushheights_sort
-	Sort brushheights_sort, brushheights_sort
-	WaveStats/Q brushheights_sort
-	Variable upper = brushheights_sort[(V_npnts-1)*.99]
+	Variable upper = GetUpperPercentile(brushheights, 99)
 	// Round to upper decade
 	upper = 10*ceil(upper/10)
 	
@@ -200,6 +197,18 @@ Function ShowResultMap()
 	DoUpdate
 	
 	return 0	
+End
+
+
+Function GetUpperPercentile(w, pct)
+	WAVE w				// wave from where to get value
+	Variable pct		// which percentile to return
+	
+	Duplicate/O/FREE w, wsort
+	Sort wsort, wsort
+	WaveStats/Q/M=1 wsort
+	Variable i = min(round((V_npnts-1)*pct/100), V_npnts-1)
+	return wsort[i]
 End
 
 
