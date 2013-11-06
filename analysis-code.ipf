@@ -39,9 +39,8 @@ Function Analysis()
 	WAVE sel=$selectionwave
 
 	WAVE/T fcmeta
-	WAVE fc
+	WAVE fc, rfc
 	String header
-	Variable num = 0
 	
 	// Save analysis parameters, or compare if already saved
 	SVAR/Z params = :internalvars:analysisparameters
@@ -132,54 +131,55 @@ Function Analysis()
 	
 	
 	// Create 2d waves for Analysis
-	Make/N=(ksFCPoints, numcurves)/O fc_blfit = NaN
-	Make/N=(ksFCPoints/8, numcurves)/O fc_sensfit = NaN
-	Make/N=(ksFCPoints, numcurves)/O fc_x_tsd = NaN
-	Make/N=(ksFCPoints, numcurves)/O fc_expfit = NaN
-	Make/N=(ksFCPoints, numcurves)/O fc_smth = NaN
-	Make/N=(ksFCPoints, numcurves)/O fc_smth_xtsd = NaN
+	Make/N=(fcpoints/8, numcurves)/O fc_sensfit = NaN
+	Make/N=(fcpoints, numcurves)/O fc_x_tsd = NaN
+	Make/N=(fcpoints, numcurves)/O fc_expfit = NaN
+	Make/N=(fcpoints, numcurves)/O fc_smth = NaN
+	Make/N=(fcpoints, numcurves)/O fc_smth_xtsd = NaN
 	
-	Make/N=(ksFCPoints, numcurves)/O rfc_x_tsd = NaN
+	Make/N=(fcpoints, numcurves)/O rfc_x_tsd = NaN
 	
 	
 	// brushheights: 1D wave to hold analysed brush heights and NaN if not analysed
 	// heightsmap: 2D (redimension later) with -100 instead of NaN
-	// deflsensfitted: 1D wave to hold fitted deflection sensitivities
+	// deflsensused: 1D wave to hold used deflection sensitivities
 	// blnoise: 1D wave to hold calculated baseline noise
 	WAVE brushheights
 	Make/N=(numcurves)/O heightsmap = NaN
-	Make/N=(numcurves)/O deflsensfitted = NaN
+	Make/N=(numcurves)/O deflsensfit = NaN
+	Make/N=(numcurves)/O deflsensused = NaN
+	Make/N=(numcurves)/O deflsenserror_used = NaN
+	Make/N=(numcurves)/O deflsenserror_orig = NaN
 	Make/N=(numcurves)/O blnoise = NaN
 	
-	// Running analysis changes the "raw" data (rescales it inplace)
+	// Running analysis changes the "raw" data (rescales it in-place)
 	// Set flag immediately before analysis starts to warn the user if he re-runs the analysis
+	// Now corrected in code, so re-running analysis doesn't corrupt data. But keep warning anyway.
 	Variable/G :internalvars:analysisDone = 1
 	
 	NVAR loadfric = :internalvars:loadFriction
+	NVAR zsensloaded = :internalvars:isZsensLoaded
+	
+	Variable messageonce = 1
+	
+	SVAR/Z yUnits = :internalvars:yUnits
+	if (!SVAR_Exists(yUnits))
+		String/G :internalvars:yUnits = "LSB"
+	endif
 	
 	for (i=0; i < numcurves; i+=1)
 	
 		if(sel[i])
 		
-			header = fcmeta[i]
-		
-			Variable rampSize = NumberByKey("rampSize", header)
-			
-			// Set Z piezo ramp size (x axis)
-			SetScale/I x 0, (rampSize), "nm", fc
-			SetScale/I x 0, (rampSize), "nm", fc_blfit
-			SetScale/I x 0, (rampSize/8), "nm", fc_sensfit
-			SetScale/I x 0, (rampSize), "nm", fc_expfit
-			
-			if (loadfric)
-				WAVE fc_fric, rfc_fric
-				fc_fric[][i] *= NumberByKey("FricVPerLSB", fcmeta[i])
-				rfc_fric[][i] *= NumberByKey("FricVPerLSB", fcmeta[i])
-				SetScale/I x, 0, (rampSize), "nm", fc_fric
-				SetScale/I x, 0, (rampSize), "nm", rfc_fric
+			// *** Call analysis function here***
+			if (ksXDataZSens == 2 && !zsensloaded)
+				print "ERROR: Forced use of Z sensor data, but data not loaded/available."
+				break
+			else
+				result = AnalyseBrushHeight4(i, brushheights)
 			endif
-		
-			result = AnalyseBrushHeight3(i, brushheights)
+			
+			
 			if(result < 0)
 				//could not determine brush height
 				heightsmap[i] = -100
@@ -189,21 +189,41 @@ Function Analysis()
 			
 			// Re-read metadata; has been changed/expanded by analysis code above
 			header = fcmeta[i]
-			deflsensfitted[i] = NumberByKey("deflSensFit", header)
+			deflsensfit[i] = NumberByKey("deflSensFit", header)
+			deflsensused[i] = NumberByKey("deflSensUsed", header)
+			deflsenserror_used[i] = deflsensfit[i] - deflsensused[i]
+			deflsenserror_orig[i] = deflsensfit[i] - NumberByKey("deflSens", header)
 			blnoise[i] = NumberByKey("blNoiseRaw", header)
 			
 			// Process retract curve
 			RetractTSD(i)
 			
-			// Disabled until retractfeature fixed for 2D FC arrays
-			// retractfeature[i]=retractedforcecurvebaselinefit(i, rampSize, VPerLSB, springConst)	//baselinefit for the retracted curves.
-		
-			num += 1
+			// Process friction curve
+			if (loadfric)
+				FricBaseline(i)
+			endif
 		endif
 		
 		Prog("Analysis",i,numcurves)
 		
 	endfor
+	
+	
+	Variable rampSize = NumberByKey("rampSizeUsed", header)		// header has still data from last analyzed curve
+			
+	// Set Z piezo ramp size (x axis)
+	SetScale/I x 0, (rampSize), "nm", fc
+	SetScale/I x 0, (rampSize/8), "nm", fc_sensfit
+	SetScale/I x 0, (rampSize), "nm", fc_expfit
+	SetScale/I x 0, (rampSize), "nm", rfc
+	
+	if (loadfric)
+		WAVE fc_fric, rfc_fric
+		SetScale/I x, 0, (rampSize), "nm", fc_fric
+		SetScale/I x, 0, (rampSize), "nm", rfc_fric
+	endif
+	
+	String/G :internalvars:yUnits = "pN"
 
 	printf "Elapsed time: %g seconds\r", round(10*(ticks-t0)/60)/10
 	
@@ -214,22 +234,35 @@ Function Analysis()
 	NVAR singlefc = :internalvars:singleFCs
 		
 	if (singlefc && (rowsize == 0))
-		return 0
+		// single curves and not a grid
+		
+		// check whether result graph already exists. If no, create new
+		SVAR/Z resultg = :internalvars:resultgraph
+		
+		if (SVAR_Exists(resultg))
+			MapToForeGround()
+		else
+			PlotXsectFC()
+		endif
 	else
 		Redimension/N=(rowsize,rowsize) heightsmap
 		
 		String/G :internalvars:resultwave = "heightsmap"
 		
-		ShowResultMap()
+		// check whether result graph already exists. If no, create new
+		SVAR/Z resultg = :internalvars:resultgraph
 		
-		SVAR resultgraph = :internalvars:resultgraph
+		if (SVAR_Exists(resultg))
+			MapToForeGround()
+		else
+			ShowResultMap()
+		endif
+		
 		SVAR imagegraph = :internalvars:imagegraph
-			
-		SetWindow $resultgraph,hook(resultinspect)=inspector
 		SetWindow $imagegraph,hook(imageinspect)=inspector
-		
-		return 0
 	endif
+	
+	return 0
 End
 
 
