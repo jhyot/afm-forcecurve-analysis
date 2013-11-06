@@ -196,7 +196,7 @@ Function Analysis()
 			blnoise[i] = NumberByKey("blNoiseRaw", header)
 			
 			// Process retract curve
-			RetractTSD(i)
+			RetractTSD3(i)
 			
 			// Process friction curve
 			if (loadfric)
@@ -1121,11 +1121,14 @@ End
 
 
 // Transform retract curve to tip-sample distance
-Function RetractTSD(index)
+Function RetractTSD3(index)
 	Variable index
 	
+	NVAR fcpoints = :internalvars:FCNumPoints
+	NVAR zsensloaded = :internalvars:isZsensLoaded
+	
 	WAVE rfc, rfc_x_tsd
-	Make/FREE/N=(ksFCPoints) w, xTSD
+	Make/FREE/N=(fcpoints) w, xTSD
 	
 	WAVE/T fcmeta
 	String header = fcmeta[index]
@@ -1133,25 +1136,84 @@ Function RetractTSD(index)
 	// copy data from 2d array to temporary wave. copy back after all analysis
 	w[] = rfc[p][index]
 
+	// Get ramp size; from Z sensor if available, otherwise from header
+	Variable rampsize = 0
+	if (zsensloaded && ksXDataZSens > 0)
+		WAVE rfc_zsens
+		Make/FREE/N=(fcpoints) wzsens
+		wzsens[] = rfc_zsens[p][index]
+		Variable lastGoodPtMargin = 0.8* NumberByKey("lastGoodPt", header)
+		
+		Wavestats/Q/M=1/R=[,lastGoodPtMargin] wzsens
+		rampsize = V_max/lastGoodPtMargin*fcpoints
+	else
+		rampsize = NumberByKey("rampSize", header)
+	endif
+	header = ReplaceNumberByKey("rampSizeUsedRetr", header, rampsize)
+	
+
 	// Set Z piezo ramp size (x axis)
-	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", w
+	SetScale/I x 0, (rampsize), "nm", w
+	
+	SVAR yUnits = :internalvars:yUnits
+	strswitch (yUnits)
+		case "LSB":
+			ConvertRawToV(w, header)
+			break
+			
+		case "pN":
+			ConvertForceToV(w, header)
+			break
+	endswitch
+	
+	// Subtract baseline as determined in approach curve
+	w -= NumberByKey("blFitInterceptV", header) +  NumberByKey("blFitSlopeV", header) * x
 	
 	// Convert y axis to nm
-	w *= NumberByKey("VPerLSB", header)
-	w *= NumberByKey("deflSensFit", header)
+	w *= NumberByKey("deflSensUsed", header)
+	
+	
 	
 	// Create x values wave for tip-sample-distance
 	// Write displacement x values
-	xTSD = NumberByKey("rampSize", header)/ksFCPoints * p
-	// Subtract deflection to get tip-sample-distance
+	if (zsensloaded && ksXDataZSens > 0)
+		xTSD[] = wzsens[p]
+	else
+		xTSD = rampsize/fcpoints * p
+	endif
+	
 	xTSD += w
 	
 	// Change y scale on all curves to pN
 	Variable springConst = NumberByKey("springConst", header)
 	w *= springConst * 1000
+
+	SetScale d 0,0,"pN", w
 	
-	WaveStats/Q xTSD
-	xTSD -= V_min
+	//Variable zeroRange = round(fcpoints / rampsize * ksDeflSens_ContactLen/2)
+	// Shift hard wall contact point to 0 in xTSD
+	//WaveStats/M=1/Q xTSD
+	//xTSD -= V_min
+	Variable shift = NumberByKey("horizShifted", header)		// use same shift as in approach curve
+	xTSD -= shift
+	
+	
+//	
+//	
+//	// Create x values wave for tip-sample-distance
+//	// Write displacement x values
+//	xTSD = NumberByKey("rampSize", header)/fcpoints * p
+//	// Subtract deflection to get tip-sample-distance
+//	xTSD += w
+//	
+//	// Change y scale on all curves to pN
+//	Variable springConst = NumberByKey("springConst", header)
+//	w *= springConst * 1000
+//	
+//	SetScale d 0,0,"pN", w
+//	
+//	WaveStats/Q xTSD
+//	xTSD -= V_min
 	
 	// write back curves to 2d wave
 	rfc[][index] = w[p]
