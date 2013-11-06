@@ -1269,11 +1269,39 @@ Function plot4(idx)
 
 End
 
+// draw red marker. kept for compatibility reasons.
+// use DrawPointMarkerColor
 Function DrawPointMarker(graph, xpos, ypos, del)
 	String graph					// graph name where to draw marker
-	Variable xpos, ypos			// x and y positions (in image pixels) for marker
+	Variable xpos, ypos			// x and y positions (in image pixels) for marker, pass NaN to not draw any marker
 	Variable del					// delete old markers before drawing new one (0=no, 1=yes)
-	Variable marker
+	
+	DrawPointMarkerColor(graph, xpos, ypos, del, 1)
+End
+
+
+Function DrawPointMarkerColor(graph, xpos, ypos, del, color)
+	String graph					// graph name where to draw marker
+	Variable xpos, ypos			// x and y positions (in image pixels) for marker, pass NaN to not draw any marker
+	Variable del					// delete old markers before drawing new one (0=no, 1=yes)
+	Variable color				// color number (1, 2), see below
+	
+	Variable col_r, col_g, col_b
+	
+	switch (color)
+		case 1:	// red
+				col_r = 65280
+				col_g = 0
+				col_b = 0
+			break
+			
+		case 2:	// blue
+				col_r = 0
+				col_g = 0
+				col_b = 65280
+			break
+	endswitch
+	
 	
 	NVAR rowsize = :internalvars:FVRowSize
 	
@@ -1291,8 +1319,43 @@ Function DrawPointMarker(graph, xpos, ypos, del)
 		DrawAction/W=$graph delete
 	endif
 	
-	SetDrawEnv/W=$graph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(65280,0,0)
-	DrawRect/W=$graph (xpos+0.3)/rowsize, 1-(ypos+0.3)/rowsize,  (xpos+0.7)/rowsize, 1-(ypos+0.7)/rowsize
+	if (numtype(xpos) == 0 && numtype(ypos) == 0)
+		SetDrawEnv/W=$graph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(col_r,col_g,col_b)
+		DrawRect/W=$graph (xpos+0.3)/rowsize, 1-(ypos+0.3)/rowsize,  (xpos+0.7)/rowsize, 1-(ypos+0.7)/rowsize
+	endif
 	
 	SetDrawLayer/W=$graph $lastLayer
+End
+
+
+// Create a legend (textbox, i.e. not automatically updated)
+// with its data folder name as description for each trace.
+Function CreateLegendFromFolders(cols)
+	Variable cols	// how many columns in legend
+	
+	String s = ""
+	String t = ""
+	String traces = TraceNameList("", ";", 1)
+	
+	Variable numtraces = ItemsInList(traces)
+	Variable rows = ceil(numtraces/cols)
+	
+	Variable i, j
+	for (i=0; i < rows; i+=1)
+		for (j=0; j<cols && i*cols+j<numtraces; j+=1)
+			t = StringFromList(j*rows+i, traces)
+			s += "\\s(" + t + ") "
+			s += GetWavesDataFolder(TraceNameToWaveRef("", t), 0)
+			s += "\t"
+		endfor
+		// remove last tab
+		s = s[0,strlen(s)-2]
+		
+		s += "\r"
+	endfor
+	
+	// remove last newline
+	s = s[0,strlen(s)-2]
+	
+	TextBox/C/N=legend0 s
 End
