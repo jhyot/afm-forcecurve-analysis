@@ -256,6 +256,8 @@ Function ShowResultMap()
 	
 	DoUpdate
 	
+	SetWindow kwTopWin,hook(resultinspect)=inspector
+	
 	return 0	
 End
 
