@@ -812,6 +812,251 @@ Function AnalyseBrushHeight3(index, wHeights)
 	return 0
 End
 
+
+
+
+// Enhancement of AnalyseBrushHeight3: use Z sensor data where available and useful (if parameter set)
+// returns:	 0 if fully successful;
+//				-1 if analysis not successful;
+Function AnalyseBrushHeight4(index, wHeights)
+	Variable index
+	WAVE wHeights
+	
+	Variable V_fitOptions = 4		// suppress CurveFit progress window
+	
+	WAVE/T fcmeta
+	
+	String header = fcmeta[index]
+	
+	NVAR fcpoints = :internalvars:FCNumPoints
+	NVAR zsensloaded = :internalvars:isZsensLoaded
+	
+	WAVE fc
+	WAVE fc_sensfit, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
+	Make/FREE/N=(fcpoints) w, xTSD, expfit, smth, smthXTSD
+	Make/FREE/N=(fcpoints/8) sensfit
+	
+	// copy data from 2d array to temporary wave. copy back after all analysis
+	w[] = fc[p][index]
+	
+	String wname = "fc" + num2str(index)
+	
+	SVAR yUnits = :internalvars:yUnits
+	Variable lastGoodPt = NaN
+	strswitch (yUnits)
+		case "LSB":
+			lastGoodPt = ConvertRawToV(w, header)
+			break
+			
+		case "pN":
+			lastGoodPt = NumberByKey("lastGoodPt", header)
+			ConvertForceToV(w, header)
+			break
+	endswitch
+	
+	header = ReplaceNumberByKey("lastGoodPt", header, lastGoodPt)
+	
+	// ignore curve end in certain operations;
+	// the curve might look bad there (e.g. in Z closed loop mode, or with very fast ramping)
+	Variable lastGoodPtMargin = round(0.8 * lastGoodPt)
+	
+	
+	// Get ramp size; from Z sensor if available, otherwise from header
+	Variable rampsize = 0
+	if (zsensloaded && ksXDataZSens > 0)
+		WAVE fc_zsens
+		Make/FREE/N=(fcpoints) wzsens
+		wzsens[] = fc_zsens[p][index]
+		
+		Wavestats/Q/M=1/R=[,lastGoodPtMargin] wzsens
+		rampsize = V_max/lastGoodPtMargin*fcpoints
+	else
+		rampsize = NumberByKey("rampSize", header)
+	endif
+	header = ReplaceNumberByKey("rampSizeUsed", header, rampsize)
+	
+	// Set Z piezo ramp size (x axis)
+	SetScale/I x 0, (rampsize), "nm", w
+	
+	
+	
+	// Fit baseline and subtract from curve
+	Variable noiseRange = round(fcpoints / rampsize * ksDeflSens_ContactLen*2)
+	//Variable noiseRange = round(0.1 * lastGoodPt)
+	Variable calcStep = round(0.2 * noiseRange)
+	Variable currentPt = lastGoodPtMargin - noiseRange
+	WaveStats/Q/R=[currentPt - noiseRange, currentPt + noiseRange] w
+	Variable baselineNoise = V_sdev
+	
+	if (calcStep < 1)
+		// something went wrong
+		fcmeta[index] = header
+		print wname + ": Could not find approx. point of interaction start"
+		return -1
+	endif
+	
+	currentPt -= calcStep
+	do
+		WaveStats/Q/R=[currentPt - noiseRange, currentPt + noiseRange] w
+		if (V_sdev > (3*baselineNoise))
+			// currentPt is ca. start of interaction
+			break
+		endif
+		currentPt -= calcStep
+	while (currentPt > noiseRange)
+	
+	if (currentPt <= noiseRange)
+		fcmeta[index] = header
+		print wname + ": Could not find approx. point of interaction start"
+		return -1
+	endif
+	
+	// go back a bit;
+	// bl fit start doesn't need to be accurate, just should not be already in interaction regime
+	Variable blFitStart = currentPt + calcStep
+	header = ReplaceNumberByKey("blFitStart", header, blFitStart)
+	
+	CurveFit/NTHR=1/Q line w[blFitStart, blFitStart + round(ksBaselineFitLength * lastGoodPt)]
+	WAVE W_coef
+	
+	header = ReplaceNumberByKey("blFitInterceptV", header, W_coef[0])
+	header = ReplaceNumberByKey("blFitSlopeV", header, W_coef[1])
+	
+	// Subtr. baseline
+	w -= (W_coef[0] + W_coef[1]*x)
+	// remove not real data (smallest LSB)
+	if ((lastGoodPt+1) < fcpoints)
+		w[lastGoodPt+1,] = 0
+	endif
+	
+	
+	// Fit deflection sensitivity
+	
+	Variable SmoothCurvePt = fcpoints / rampsize * ksDeflSens_ContactLen
+	// needs odd number; "round" to next odd
+	SmoothCurvePt = RoundToOdd(SmoothCurvePt)
+	
+	Variable SmoothDerivPt = fcpoints / rampsize * ksDeflSens_ContactLen/2
+	SmoothDerivPt = RoundToOdd(SmoothDerivPt)
+	
+	Duplicate/O/R=[0,lastGoodPtMargin] w, w1
+	Smooth/E=3/B SmoothCurvePt, w1
+	Duplicate/O/R=[0,lastGoodPtMargin] w, w2
+	Differentiate w1/D=w2
+	Duplicate/O/R=[0,lastGoodPtMargin] w2, w3
+	Smooth/M=0 SmoothDerivPt, w3
+	WaveStats/Q w3
+	Variable AvgBox = round(fcpoints / rampsize * ksDeflSens_ContactLen/10)
+	AvgBox = max(AvgBox, 1)
+	EdgeStats/Q/A=(AvgBox)/P/R=[V_minRowLoc, blFitStart]/F=(ksDeflSens_EdgeFraction) w3
+	
+	Variable hardwallPt = round(V_EdgeLoc1)
+	header = ReplaceNumberByKey("hardwallPt", header, hardwallPt)
+	
+	if (zsensloaded && ksXDataZSens > 0)
+		CurveFit/NTHR=1/Q line  w[3,hardwallPt]/X=wzsens
+	else
+		CurveFit/NTHR=1/Q line  w[3,hardwallPt]
+	endif
+
+	SetScale/I x 0, (rampsize/8), "nm", sensfit
+	sensfit = W_coef[0] + W_coef[1]*x
+	
+	// use fitted sens by default, can be modified below
+	Variable deflSens = -1/W_coef[1]
+	
+	header = ReplaceNumberByKey("deflSensFit", header, deflSens)
+	
+	if (ksFixDefl == 1)
+		// use saved defl sens from header.
+		// if we have already set a used deflsens, use that
+		
+		// DO WE NEED TO INCORPORATE BASELINE SUBTRACTION TO DEFLSENS?
+		// Formula (I think...): s' = 1 / ( 1/s + B )  ;  s' new deflsens, s old deflsens, B baseline slope
+		
+		deflSens = NumberByKey("deflSensUsed", header)
+		if (numtype(deflSens) != 0)
+			// use the original one from header
+			deflSens = NumberByKey("deflSens", header)
+		endif
+	endif
+	
+	// Add used sens. to header data
+	header = ReplaceNumberByKey("deflSensUsed", header, deflSens)
+
+	// Change y scale on all curves to nm
+	w *= deflSens
+	sensfit *= deflSens
+	
+	// Binomially smoothed curve for contact point determination
+	Duplicate/O w, smth
+	Smooth/E=3 SmoothCurvePt, smth
+	
+	// Create x values wave for tip-sample-distance
+	// Write displacement x values
+	if (zsensloaded && ksXDataZSens > 0)
+		xTSD[] = wzsens[p]
+	else
+		xTSD = rampsize/fcpoints * p
+	endif
+	
+	Duplicate/O xTSD, smthXTSD
+	// Subtract deflection to get tip-sample-distance
+	xTSD += w
+	smthXTSD += smth
+	
+	// Change y scale on all curves to pN
+	Variable springConst = NumberByKey("springConst", header)
+	w *= springConst * 1000
+	sensfit *= springConst * 1000
+	smth *= springConst * 1000
+
+	SetScale d 0,0,"pN", w, sensfit, smth
+	
+	Variable zeroRange = round(fcpoints / rampsize * ksDeflSens_ContactLen/2)
+	//Variable zeroRange = 0.025 * fcpoints
+	// Shift hard wall contact point to 0 in xTSD
+	WaveStats/R=[3,zeroRange]/Q xTSD
+	xTSD -= V_avg
+	header = ReplaceNumberByKey("horizShifted", header, V_avg)
+	
+	WaveStats/R=[3,zeroRange]/Q smthXTSD
+	smthXTSD -= V_avg
+	
+	// write back curves to 2d wave
+	fc[][index] = w[p]
+	fc_sensfit[][index] = sensfit[p]
+	fc_x_tsd[][index] = xTSD[p]
+	fc_smth[][index] = smth[p]
+	fc_smth_xtsd[][index] = smthXTSD[p]
+		
+	// function not finished
+	//Variable height = CalcBrushHeight(w, header)
+	
+	// Extract contact point as point above noise.
+	// Noise = StDev from first part of baseline (as found above)
+	WaveStats/Q/R=[blFitStart, blFitStart + round(lastGoodPt*ksBaselineFitLength)] w
+	header = ReplaceNumberByKey("blNoiseRaw", header, V_sdev)
+	WaveStats/Q/R=[blFitStart, blFitStart + round(lastGoodPt*ksBaselineFitLength)] smth
+	header = ReplaceNumberByKey("blNoise", header, V_sdev)
+	
+	// Brush height as first point above noise multiplied by a factor
+	FindLevel/Q/EDGE=2/P smth, ksBrushOverNoise * V_sdev
+	if (V_flag != 0)
+		fcmeta[index] = header
+		Print wname + ": Brush contact point not found"
+		return -1
+	endif
+	Variable height = smthXTSD[ceil(V_LevelX)]
+	
+	header = ReplaceNumberByKey("brushContactPt", header, ceil(V_LevelX))
+	fcmeta[index] = header
+	wHeights[index] = height
+
+	return 0
+End
+
+
 // Function not done, not yet in use
 Function CalcBrushHeight(w, wsmth, wsmth_xtsd, header)
 	WAVE w, wsmth, wsmth_xtsd
