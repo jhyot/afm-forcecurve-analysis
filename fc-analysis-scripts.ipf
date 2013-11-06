@@ -49,7 +49,7 @@ Menu "Force Map Analysis"
 	"-"
 	"Load Image...", LoadImage()
 	"Show Image", ImageToForeground()
-	"Show Height Map", MapToForeground()
+	"Show Height Results", MapToForeground()
 	"-"
 	Submenu "Review"
 		"Flag curves...", FlagCurves()
@@ -57,9 +57,16 @@ Menu "Force Map Analysis"
 		"-"
 		"Review Flagged Curves", ReviewCurvesFlagged()
 		"Review All Curves", ReviewCurvesAll()
+		"-"
+		"Classify Curves", ClassifyCurves()
+		"Mark classified", MarkClassifiedPixels()
+	End
+	Submenu "Helper"
+		"Brush Histogram", BrushHisto(1)
+		"Subtract Baseline", SubtractBaseline()
 	End
 	"-"
-	"Settings...", SetSettings()
+	"Settings...", SetSettings(0)
 End
 
 
