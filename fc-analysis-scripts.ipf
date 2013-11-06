@@ -139,13 +139,16 @@ Function SetSettings(flags)
 	String fricStr = SelectString(fric, "No", "Yes")
 	String zsensStr = SelectString(zsens, "No", "Yes")
 	
-	Prompt fricStr, "Load Friction data?", popup, list
-	Prompt zsensStr, "Load Z Sensor data?", popup, list
-	DoPrompt "Set Settings", fricStr, zsensStr
-	
-	if (V_flag == 1)
-		// User pressed cancel
-		return -1
+	NVAR/Z nodialogs = :internalvars:noDialogs
+	if (!NVAR_Exists(nodialogs) || nodialogs == 0)
+		Prompt fricStr, "Load Friction data?", popup, list
+		Prompt zsensStr, "Load Z Sensor data?", popup, list
+		DoPrompt "Set Settings", fricStr, zsensStr
+		
+		if (V_flag == 1)
+			// User pressed cancel
+			return -1
+		endif
 	endif
 	
 	Variable/G :internalvars:loadFriction = (cmpstr(fricStr, "Yes") == 0) ? 1 : 0

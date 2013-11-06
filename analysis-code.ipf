@@ -10,9 +10,14 @@ Function Analysis()
 	endif
 		
 	NVAR/Z analysisDone = :internalvars:analysisDone
-	if (NVAR_Exists(analysisDone) && analysisDone == 1)
+	NVAR/Z nodialogsnvar = :internalvars:noDialogs
+	Variable nodialogs = 0
+	if (NVAR_Exists(nodialogsnvar))
+		nodialogs = nodialogsnvar
+	endif
+	if (nodialogs == 0 && NVAR_Exists(analysisDone) && analysisDone == 1)
 		String alert = ""
-		alert = "Analysis has been run already on this data.\r"
+		alert = "Analysis has been run already on this data folder.\r"
 		alert += "Re-running can lead to wrong results. Continue anyway?"
 		DoAlert 1, alert
 		
