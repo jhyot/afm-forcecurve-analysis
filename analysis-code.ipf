@@ -249,10 +249,12 @@ Function AnalyseBrushHeight1(index, wHeights)
 	
 	String header = fcmeta[index]
 	
+	NVAR fcpoints = :internalvars:FCNumPoints
+	
 	WAVE fc
 	WAVE fc_blfit, fc_sensfit, fc_x_tsd, fc_expfit
-	Make/FREE/N=(ksFCPoints) w, blfit, xTSD, expfit
-	Make/FREE/N=(ksFCPoints/8) sensfit
+	Make/FREE/N=(fcpoints) w, blfit, xTSD, expfit
+	Make/FREE/N=(fcpoints/8) sensfit
 	
 	// copy data from 2d array to temporary wave. copy back after all analysis
 	w[] = fc[p][index]
@@ -285,7 +287,7 @@ Function AnalyseBrushHeight1(index, wHeights)
 	sensfit = W_coef[0] + W_coef[1]*x
 	Variable deflSens = -1/W_coef[1]
 	// Add fitted sens. to header data
-	header += "deflSensFit:" + num2str(deflSens) + ";"
+	header += "deflSensUsed:" + num2str(deflSens) + ";"
 	fcmeta[index] = header
 	// Change y scale on all curves to nm
 	w *= deflSens
@@ -294,7 +296,7 @@ Function AnalyseBrushHeight1(index, wHeights)
 	
 	// Create x values wave for tip-sample-distance
 	// Write displacement x values
-	xTSD = NumberByKey("rampSize", header)/ksFCPoints * p
+	xTSD = NumberByKey("rampSize", header)/fcpoints * p
 	// Subtract deflection to get tip-sample-distance
 	xTSD += w
 	
@@ -408,10 +410,12 @@ Function AnalyseBrushHeight2(index, wHeights)
 	
 	String header = fcmeta[index]
 	
+	NVAR fcpoints = :internalvars:FCNumPoints
+	
 	WAVE fc
 	WAVE fc_blfit, fc_sensfit, fc_x_tsd, fc_expfit
-	Make/FREE/N=(ksFCPoints) w, blfit, xTSD, expfit
-	Make/FREE/N=(ksFCPoints/8) sensfit
+	Make/FREE/N=(fcpoints) w, blfit, xTSD, expfit
+	Make/FREE/N=(fcpoints/8) sensfit
 	
 	// copy data from 2d array to temporary wave. copy back after all analysis
 	w[] = fc[p][index]
@@ -443,12 +447,12 @@ Function AnalyseBrushHeight2(index, wHeights)
 	// Subtr. baseline
 	w -= (W_coef[0] + W_coef[1]*x)
 	// remove not real data (smallest LSB)
-	if ((lastGoodPt+1) < ksFCPoints)
+	if ((lastGoodPt+1) < fcpoints)
 		w[lastGoodPt+1,] = 0
 	endif
 	
 	// Fit deflection sensitivity and change y scale
-	Make/FREE/N=(ksFCPoints) w1, w2, w3
+	Make/FREE/N=(fcpoints) w1, w2, w3
 	Duplicate/O w, w1
 	Smooth/E=3/B 501, w1
 	Differentiate w1/D=w2
@@ -466,7 +470,7 @@ Function AnalyseBrushHeight2(index, wHeights)
 	sensfit = W_coef[0] + W_coef[1]*x
 	Variable deflSens = -1/W_coef[1]
 	// Add fitted sens. to header data
-	header += "deflSensFit:" + num2str(deflSens) + ";"
+	header += "deflSensUsed:" + num2str(deflSens) + ";"
 	fcmeta[index] = header
 
 	// Change y scale on all curves to nm
@@ -476,7 +480,7 @@ Function AnalyseBrushHeight2(index, wHeights)
 	
 	// Create x values wave for tip-sample-distance
 	// Write displacement x values
-	xTSD = NumberByKey("rampSize", header)/ksFCPoints * p
+	xTSD = NumberByKey("rampSize", header)/fcpoints * p
 	// Subtract deflection to get tip-sample-distance
 	xTSD += w
 	
@@ -1536,7 +1540,7 @@ Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	make/N=(numcurves)/O timer4
 	Variable tic4
 	
-	
+	NVAR fcpoints = :internalvars:FCNumPoints
 	
 	// Set Z piezo ramp size (x axis)
 	SetScale/I x 0, rampSize, "nm", rw
@@ -1552,7 +1556,7 @@ Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	// Fit baseline and subtract from curve
 	CurveFit/NTHR=1/Q line  rw[2600,3600]
 	WAVE W_coef
-	Make/N=(ksFCPoints) $(wname + "_blfit")
+	Make/N=(fcpoints) $(wname + "_blfit")
 	WAVE blfit = $(wname + "_blfit")
 	SetScale/I x 0, rampSize, "nm", blfit
 	// Save baseline to fc<i>_blfit
@@ -1569,14 +1573,14 @@ Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	tic3=ticks
 	// Fit deflection sensitivity and change y scale
 	CurveFit/NTHR=1/Q line  rw[10,100]
-	Make/N=(ksFCPoints/8) $(wname + "_sensfit")	// display only 4096/8 points
+	Make/N=(fcpoints/8) $(wname + "_sensfit")	// display only 4096/8 points
 	WAVE sensfit = $(wname + "_sensfit")
 	SetScale/I x 0, (rampSize/8), "nm", sensfit
 	// Save fit to fc<i>_sensfit
 	sensfit = W_coef[0] + W_coef[1]*x
 	Variable deflSens = -1/W_coef[1]
 	// Add fitted sens. to header data
-	header += "deflSensFit:" + num2str(deflSens) + ";"
+	header += "deflSensUsed:" + num2str(deflSens) + ";"
 	//Note/K w, header
 	// Change y scale on all curves to nm
 	rw *= deflSens
@@ -1588,13 +1592,13 @@ Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	tic4=ticks
 	
 	// Create x values wave for tip-sample-distance
-	Make/N=(ksFCPoints) $(wname + "_x_tsd")
+	Make/N=(fcpoints) $(wname + "_x_tsd")
 	WAVE xTSD = $(wname + "_x_tsd")
 	
 	timer4[index]=(ticks-tic4)/60
 	
 	// Write displacement x values
-	xTSD = rampSize/ksFCPoints * p
+	xTSD = rampSize/fcpoints * p
 	// Subtract deflection to get tip-sample-distance
 	xTSD += rw
 	
