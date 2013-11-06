@@ -1124,6 +1124,83 @@ Function RetractTSD(index)
 End
 
 
+// Baseline fitting of friction data (horizontal deflection)
+// Fit (linear) last part of approach friction curve (up to last good point)
+// and correct both approach and retract curves with this fit.
+Function FricBaseline(index)
+	Variable index
+	
+	Variable V_fitOptions = 4		// suppress CurveFit progress window
+	
+	WAVE/T fcmeta
+	
+	String header = fcmeta[index]
+	
+	NVAR fcpoints = :internalvars:FCNumPoints
+	
+	WAVE fc_fric, rfc_fric
+	Make/FREE/N=(fcpoints) wapp, wret
+	
+	// copy data from 2d array to temporary wave. copy back after all analysis
+	wapp[] = fc_fric[p][index]
+	wret[] = rfc_fric[p][index]
+
+	// Set Z piezo ramp size (x axis)
+	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", wapp
+	SetScale/I x 0, (NumberByKey("rampSize", header)), "nm", wret
+	
+	// Sometimes last points of curve are at smallest LSB value
+	// Set those to 0 (after baseline substraction)
+	Variable lastGoodPt = numpnts(wapp) - 1
+	FindLevel/Q/P wapp, (-1*2^15 + 1)
+	if (V_flag == 0)
+		lastGoodPt = floor(V_LevelX) - 1
+	endif
+	FindLevel/Q/P wret, (-1*2^15 + 1)
+	if (V_flag == 0)
+		lastGoodPt = min(floor(V_LevelX) - 1, lastGoodPt)
+	endif
+	
+	// User defined forcing of last good pt
+	if (ksMaxGoodPt >= 0)
+		lastGoodPt = min(lastGoodPt, ksMaxGoodPt)
+	endif
+	
+	header = ReplaceNumberByKey("fricLastGoodPt", header, lastGoodPt)
+	
+	
+	// ignore curve end in certain operations;
+	// the curve might look bad there (e.g. in Z closed loop mode, or with very fast ramping)
+	Variable lastGoodPtMargin = round(0.8 * lastGoodPt)
+	
+	// Convert y axis to V
+	wapp *= NumberByKey("FricVPerLSB", header)
+	wret *= NumberByKey("FricVPerLSB", header)
+	
+	CurveFit/NTHR=1/Q line wapp[lastGoodPtMargin*(1-ksBaselineFitLength), lastGoodPtMargin]
+	WAVE W_coef
+	
+	header = ReplaceNumberByKey("fricBlFitInterceptV", header, W_coef[0])
+	header = ReplaceNumberByKey("fricBlFitSlopeV", header, W_coef[1])
+	
+	// Subtr. baseline
+	wapp -= (W_coef[0] + W_coef[1]*x)
+	wret -= (W_coef[0] + W_coef[1]*x)
+	// remove not real data (smallest LSB)
+	if ((lastGoodPt+1) < fcpoints)
+		wapp[lastGoodPt+1,] = 0
+		wret[lastGoodPt+1,] = 0
+	endif
+	
+	// write back curves to 2d wave
+	fc_fric[][index] = wapp[p]
+	rfc_fric[][index] = wret[p]
+	
+	fcmeta[index] = header
+	
+	return 0
+	
+End
 
 Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	Variable index, rampSize, VPerLSB, springConst
