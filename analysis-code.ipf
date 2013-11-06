@@ -1665,3 +1665,15 @@ Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	return -1
 	
 End
+
+
+// returns "rounded" odd integer
+// e.g. 5.9 returns 5; 6.0 returns 7
+Function RoundToOdd(a)
+	Variable a
+	
+	a = floor(a)
+	a = mod(a, 2) ? a : a+1
+	
+	return a
+End
