@@ -156,6 +156,10 @@ Function SetSettings(flags)
 		Variable/G :internalvars:isDataLoaded = 0
 	endif
 	
+	NVAR/Z iszsensloaded = :internalvars:isZsensLoaded
+	if (!NVAR_Exists(iszsensloaded))
+		Variable/G :internalvars:isZsensLoaded = 0
+	endif	
 End
 
 
