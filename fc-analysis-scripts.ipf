@@ -1,5 +1,6 @@
 #pragma rtGlobals=3		// Use modern global access method.
 //#pragma IndependentModule=ForceMapAnalysis  // disabled for easier debugging etc
+SetIgorOption colorize,UserFuncsColorized=1
 
 
 #include ":fc-script-config"
@@ -17,7 +18,6 @@
 
 
 // TODO
-// enhance retraction curve handling
 // Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
 // Make button in heightimage and heightmap for inspect mode (i.e. be able to turn off inspect mode)
 // indicate flagged curves in review
@@ -26,6 +26,7 @@
 // Print analysis algorithm name and parameters when starting analysis
 // rename analysis parameter constants to be absolutely clear from their names
 // Single FCs: do appropriate checks in user accessible functions (like in all the other ones)
+// Read image scale ("scan size") when loading a map. Check whether works well with all the pixel selecting code etc
 
 
 
@@ -68,8 +69,6 @@ Menu "Force Map Analysis"
 	"-"
 	"Settings...", SetSettings(0)
 End
-
-
 
 
 
@@ -181,7 +180,7 @@ End
 
 
 
-
+// Progress bar code
 
 constant PROGWIN_BAR_HEIGHT=20
 constant PROGWIN_BAR_WIDTH=250
