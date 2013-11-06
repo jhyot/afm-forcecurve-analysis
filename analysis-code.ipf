@@ -1202,6 +1202,93 @@ Function FricBaseline(index)
 	
 End
 
+
+Function RecalcDeflSens(dsens, idx)
+	Variable dsens		// defl. sens. in nm/V
+	Variable idx			// index of curve to set
+	
+	WAVE/T fcmeta
+	
+	NVAR/Z analysisdone = :internalvars:analysisDone
+	
+	if (!NVAR_Exists(analysisdone) || analysisdone < 1)
+		// Analysis not run yet. Just update header entry for analysis
+		fcmeta[idx] = ReplaceNumberByKey("deflSensUsed", fcmeta[idx], dsens)
+		return 0
+	endif
+
+	WAVE fc, rfc, fc_x_tsd, rfc_x_tsd
+	
+	Duplicate/FREE/O/R=[][idx] fc, w
+	Duplicate/FREE/O/R=[][idx] rfc, rw
+	Duplicate/FREE/O/R=[][idx] fc_x_tsd, wtsd
+	Duplicate/FREE/O/R=[][idx] rfc_x_tsd, rwtsd
+	
+	
+	Variable springconst = NumberByKey("springConst", fcmeta[idx])
+	Variable olddsens = NumberByKey("deflSensUsed", fcmeta[idx])
+	NVAR fcpoints = :internalvars:FCNumPoints
+	NVAR zsensloaded = :internalvars:isZsensLoaded
+	
+	// convert from pN to V
+	w /= springconst * 1000 * olddsens
+	rw /= springconst * 1000 * olddsens
+	
+	// V -> nm
+	w *= dsens
+	rw *= dsens
+	
+	Variable rampsize = NumberByKey("rampSizeUsed", fcmeta[idx])
+	Variable rampsizeretr = NumberByKey("rampSizeUsedRetr", fcmeta[idx])
+	
+	// Create x values wave for tip-sample-distance
+	if (zsensloaded && ksXDataZSens > 0)
+		WAVE fc_zsens, rfc_zsens
+		wtsd = fc_zsens[p][idx]
+		rwtsd = rfc_zsens[p][idx]
+	else
+		wtsd = rampsize/fcpoints * p
+		rwtsd = rampsizeretr/fcpoints * p
+	endif
+	
+	// Subtract deflection to get tip-sample-distance
+	wtsd += w
+	rwtsd += rw
+	
+	w *= springconst * 1000
+	rw *= springconst * 1000
+	
+	// Shift hard wall contact point to 0 in TSD
+	Variable zeroRange = round(fcpoints / rampsize * ksDeflSens_ContactLen/2)
+	WaveStats/M=1/R=[3,zeroRange]/Q wtsd
+	wtsd -= V_avg
+	WaveStats/Q/M=1 rwtsd
+	rwtsd -= V_min
+	
+	// write back to 2D waves
+	fc[][idx] = w[p]
+	rfc[][idx] = rw[p]
+	fc_x_tsd[][idx] = wtsd[p]
+	rfc_x_tsd[][idx] = rwtsd[p]
+	
+	// Update metadata
+	fcmeta[idx] = ReplaceNumberByKey("deflSensUsed", fcmeta[idx], dsens)
+	
+End
+
+
+Function RecalcDeflSensAll(dsens)
+	Variable dsens		// defl. sens. in nm/V
+	
+	NVAR numcurves = :internalvars:numCurves
+	
+	Variable i
+	for (i=0; i<numcurves; i+=1)
+		RecalcDeflSens(dsens, i)
+		Prog("DeflSens", i, numcurves)
+	endfor
+End
+
 Function retractedforcecurvebaselinefit(index, rampSize, VPerLSB, springConst)
 	Variable index, rampSize, VPerLSB, springConst
 	
