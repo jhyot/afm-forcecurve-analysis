@@ -28,7 +28,7 @@ End
 Function scatterplots(img, bheights, added, nobrushrel, nobrushabs)
 	String img, bheights, added, nobrushrel, nobrushabs
 	
-	Variable doabs = 1
+	Variable doabs = 0
 	if (cmpstr(added, "") == 0)
 		// skip absolute brush height
 		doabs = 0
