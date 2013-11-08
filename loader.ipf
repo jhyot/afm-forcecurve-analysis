@@ -16,6 +16,7 @@ Function LoadAndAnalyseAllFV()
 	
 	SVAR selectionwave = :internalvars:selectionwave
 	NVAR numcurves = :internalvars:numCurves
+	NVAR fcpoints = :internalvars:FCNumPoints
 
 	Make/O/N=(numcurves) $selectionwave = NaN
 
@@ -23,7 +24,7 @@ Function LoadAndAnalyseAllFV()
 	Wave sel=$selectionwave
 	Variable i
 	for(i=0;i<(numcurves);i+=1)
-		sel[i] = NumberByKey("dataOffset", fvmeta) + ksFCPoints*2*2*i
+		sel[i] = NumberByKey("dataOffset", fvmeta) + fcpoints*2*2*i
 	endfor
 
 	SVAR totalpath = :internalvars:totalpath
@@ -70,7 +71,6 @@ Function LoadForceMap()
 		return -1
 	endif
 	
-	Variable/G :internalvars:FCNumPoints = ksFCPoints
 	Variable/G :internalvars:FVRowSize = ksFVRowSize
 	Variable/G :internalvars:numCurves = ksFVRowSize*ksFVRowSize
 	
@@ -230,12 +230,10 @@ Function ReadMap(fileName)
 	String fileName			// Full Igor-style path to file ("folder:to:file.ext")
 	
 	NVAR numcurves = :internalvars:numCurves
-	NVAR fcpoints = :internalvars:FCNumPoints
 	
 	Variable result
 	String headerData
 	
-	// Read and parse FC file header
 	result = ParseFVHeader(fileName, "fullHeader", "subGroupTitles", headerData)
 	
 	if (result < 0)
@@ -260,6 +258,13 @@ Function ReadMap(fileName)
 		print "Could not load FV image data"
 		return -1
 	endif
+
+	Variable fcpoints = NumberByKey("FCNumPoints", fvmeta)
+	if ((ksFixPointNum == 1) && (fcpoints != ksFCPoints))
+		print "[ERROR] Wrong number of points per curve in FV"
+		return -1
+	endif
+	Variable/G :internalvars:FCNumPoints = fcpoints
 
 	// Create waves for holding the curves (2d array, 1 column per curve)
 	// and for metadata about each curve (1 row per curve)
@@ -398,13 +403,7 @@ Function LoadSingleFCFolder(path)
 	String fullFilename = ""
 	String headerData = ""
 	
-	Variable/G :internalvars:FCNumPoints = ksFCPoints
-	NVAR fcpoints = :internalvars:FCNumPoints
-	NVAR loadzsens = :internalvars:loadZSens
-	if (loadzsens)
-		Make/O/N=(fcpoints, 0) fc_zsens=NaN, rfc_zsens=NaN
-	endif
-	
+	Variable firstgood = 1
 	for (i=0; i < n; i+=1)
 		Prog("ReadSingleFCs", i+1, n)
 		
@@ -421,6 +420,21 @@ Function LoadSingleFCFolder(path)
 		
 		Redimension/N=(numread+1) fcmeta
 		fcmeta[numread] = headerData
+		
+		if (firstgood)
+			firstgood = 0
+			Variable fcpoints = NumberByKey("FCNumPoints", headerData)
+			if ((ksFixPointNum == 1) && (ksFCPoints != fcpoints))
+				print "[ERROR] Incorrect number of points per curve"
+				return -1
+			endif
+			Variable/G :internalvars:FCNumPoints = fcpoints
+			
+			NVAR loadzsens = :internalvars:loadZSens
+			if (loadzsens)
+				Make/O/N=(fcpoints, 0) fc_zsens=NaN, rfc_zsens=NaN
+			endif
+		endif
 		
 		if (loadzsens)
 			Redimension/N=(numread+1) fc_z

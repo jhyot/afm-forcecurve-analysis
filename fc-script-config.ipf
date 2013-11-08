@@ -13,6 +13,8 @@ StrConstant ksVersionReq = "0x07300000,0x08100000,0x08150300,0x08150304,0x090001
 // only thoroughly tested with 4096, but should work with 2048 etc.
 // (too few points may cause bad curve transformations and analysis)
 Constant ksFCPoints = 4096
+Constant ksFixPointNum = 0	// 0: read number of points from header;
+									// 1: use above constant (gives error if number in header differs)
 
 // Force curves per row.
 // Tested with 32 and 16 pixels per row

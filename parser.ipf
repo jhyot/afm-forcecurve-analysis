@@ -436,10 +436,11 @@ Function ParseFCHeader(filename, headerwave, titleswave, headerData)
 	endif
 	
 	Variable fcpoints = Header_GetNumPoints(fullheader, subGroupTitles)
-	if (fcpoints != fcpoints_const)
-		Print filename + ": Wrong number of data points per curve"
+	if (fcpoints <= 0)
+		Print filename + ": Couldn't get number of data points per curve"
 		return -1
 	endif
+	headerData = ReplaceNumberByKey("FCNumPoints", headerData, fcpoints)
 	
 	// returns NaN if didn't find x/y pos
 	Variable xpos = Header_GetXPos(fullheader, subGroupTitles)
@@ -577,8 +578,6 @@ Function ParseFVHeader(fileName, headerwave, titleswave, headerData)
 	Variable result, subGroupOffset
 	headerData = ""
 	
-	NVAR fcpoints_const = :internalvars:FCNumPoints
-	
 	result = ReadHeaderLines(fileName, headerwave)
 	if (result != 0)
 		Print fileName + ": Did not find header end"
@@ -617,10 +616,11 @@ Function ParseFVHeader(fileName, headerwave, titleswave, headerData)
 	endif
 	
 	Variable fcpoints = Header_GetNumPoints(fullheader, subGroupTitles)
-	if (fcpoints != fcpoints_const)
-		Print filename + ": Wrong number of data points per curve"
+	if (fcpoints <= 0)
+		Print filename + ": Couldn't read number of data points per curve"
 		return -1
 	endif
+	headerData = ReplaceNumberByKey("FCNumPoints", headerData, fcpoints)
 	
 	// Deflection Error channel
 	Variable index = Header_FindDataType(fullheader, subGroupTitles, "DeflectionError")

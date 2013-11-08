@@ -491,7 +491,9 @@ End
 Function ConvTempRawToV(i)
 	Variable i
 	
-	Make/N=(ksfcpoints)/O wtemp
+	NVAR fcpoints = :internalvars:FCNumPoints
+	
+	Make/N=(fcpoints)/O wtemp
 	
 	WAVE fc
 	WAVE/T fcmeta
