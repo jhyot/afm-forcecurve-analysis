@@ -277,7 +277,7 @@ End
 Function PlotFC(index)
 	Variable index
 	
-	Display
+	Display/K=1
 	String name = MakeGraphName("fc" + num2str(index) + "_plot")
 	DoWindow/C $name
 	
