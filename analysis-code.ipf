@@ -174,7 +174,7 @@ Function Analysis()
 			// *** Call analysis function here***
 			if (ksXDataZSens == 2 && !zsensloaded)
 				print "ERROR: Forced use of Z sensor data, but data not loaded/available."
-				break
+				return -1
 			else
 				result = AnalyseBrushHeight4(i, brushheights)
 			endif
