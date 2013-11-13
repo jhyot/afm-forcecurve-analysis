@@ -43,7 +43,7 @@ Constant ksDeflSens_EdgeFraction = 0.02	// Defines end of hardwall part, the clo
 
 // Further Analysis parameters
 Constant ksFixDefl = 1 				// Deflection sensitivity; 0: Fit for each curve; 1: Use fixed from header
-Constant ksXDataZSens = 2				// 0: don't use Zsensor data as X axis; 1: use Zsensor data where available;
+Constant ksXDataZSens = 1				// 0: don't use Zsensor data as X axis; 1: use Zsensor data where available;
 											// 2: force use of Zsensor data; i.e. abort when not available
 Constant ksMaxGoodPt = -1			// (-1: ignore) Manually force the "last good point" to be below this value
 											// (e.g. if there are problems with data);

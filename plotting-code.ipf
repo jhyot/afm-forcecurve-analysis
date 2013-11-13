@@ -327,7 +327,7 @@ Function PlotFC_plotdata(index)
 	endif
 	
 	// Somewhat of a "hack" to switch on/off parts of elements on graph
-	Variable mode = 1
+	Variable mode = 0
 	
 	GetWindow kwTopWin, userdata
 	String winUserdata = S_Value
