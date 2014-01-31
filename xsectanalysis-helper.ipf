@@ -830,3 +830,17 @@ Function/S FindSubDataFolder(matchstr)
 End
 
 
+Function BinSizeFreedmanDiaconis(wname)
+	String wname
+	
+	WaveStats/Q $wname
+	StatsQuantiles/Q $wname
+	
+	return 2 * V_IQR / (V_npnts^(1/3))
+End
+
+Function BinSizeSuggestion(wname)
+	String wname
+	
+	return BinSizeFreedmanDiaconis(wname)
+End
