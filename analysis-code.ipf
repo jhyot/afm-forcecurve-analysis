@@ -608,7 +608,7 @@ End
 // returns the last good point in curve
 Function ConvertRawToV(w, header)
 	WAVE w
-	String header		// pass by reference
+	String header
 		
 	// Sometimes last points of curve are at smallest LSB value
 	// Set those to 0 (after baseline substraction)
@@ -635,7 +635,7 @@ End
 // Convert y data from force units (pN) back to V (for rerunning analysis)
 Function ConvertForceToV(w, header)
 	WAVE w
-	String header		// pass by ref
+	String header
 	
 	Variable springConst = NumberByKey("springConst", header)
 	w /= springConst * 1000
