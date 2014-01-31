@@ -116,6 +116,38 @@ Function ChangeColorAccordingToFolder(index)
 	ModifyGraph rgb[index]=(r,g,b)
 End
 
+
+Function FitDeflSensAndMakeTSD(w, meta)
+	WAVE w
+	String meta
+	
+	NVAR/Z deflfit = $(NameOfWave(w) + "_deflfit")
+	if (NVAR_Exists(deflfit))
+		meta = ReplaceNumberByKey("deflSensUsed", meta, deflfit)
+	else
+		Variable/G $(NameOfWave(w) + "_deflfit")
+		NVAR deflfit = $(NameOfWave(w) + "_deflfit")
+	endif
+	
+	STRUCT FitDeflReturn ret
+	ConvertForceToV(w, meta)
+	FitDeflectionSensitivity(w, meta, $"", ret)
+	deflfit = ret.deflsensfit
+	
+	w *= deflfit
+	
+	print "deflSensFit:", deflfit
+	
+	STRUCT CreateTSDReturn rettsd
+	CreateTSDWave(w, $"", rettsd)
+	
+	Duplicate/O rettsd.tsd, $(NameOfWave(w) + "_xtsd")
+	
+	w *= 1000 * NumberByKey("springConst", meta)
+	SetScale d 0,0,"pN", w
+End
+
+
 // this is a "hack" function; before running it, make sure it really does
 // what you want (hardcoded values etc.)
 Function AutoLoadFCFolder()
