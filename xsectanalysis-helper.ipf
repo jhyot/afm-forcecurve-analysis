@@ -1,5 +1,7 @@
 #pragma rtGlobals=3		// Use modern global access method.
 
+#include <Waves Average>
+
 Function findmax()
 	Variable i = 0
 	WAVE fc
@@ -844,6 +846,177 @@ Function BinSizeSuggestion(wname)
 	
 	return BinSizeFreedmanDiaconis(wname)
 End
+
+
+// Run in same data folder as indicated waves
+// At the moment processes 2 ranges; (hardcoded below)
+Function MarkCurvesAroundAvg(wlist, markwlist, avglist, tolerancelist)
+	String wlist				// list of wave names, without folder names, to process
+	
+	String markwlist			// list of mark wave names (will be overwritten); must be 1 longer
+								// than wave list; last entry is combination (logical AND) of all mark waves
+								
+	String avglist			// list of averages; waves with avg +/- tolerance will be marked
+								// has 2 values per wave, one for each hardcoded range;
+								// i.e. double the length of wave list
+								
+	String tolerancelist	// list of tolerances; must be length of wave list
+	
+	
+	Variable range1start = 0
+	Variable range1end = 40
+	Variable range2start = 100
+	
+	
+	Variable numitems = ItemsInList(wlist)
+	
+	if ((ItemsInList(avglist) != 2*numitems) || (ItemsInList(tolerancelist) != numitems) || (ItemsInList(markwlist) != numitems+1))
+		print "[ERROR] List lengths do not match"
+		return -1
+	endif
+
+	
+	Variable i
+	String wname
+	String markname
+	Variable avg1, avg2
+	Variable tol
+	for (i=0; i < numitems; i += 1)
+		wname = StringFromList(i, wlist)
+		markname = StringFromList(i, markwlist)
+		avg1 = str2num(StringFromList(2*i, avglist))
+		avg2 = str2num(StringFromList(2*i+1, avglist))
+		tol = str2num(StringFromList(i, tolerancelist))
+		
+		Duplicate/O $wname, $markname
+		WAVE markw = $markname
+		WAVE w = $wname
+		markw = NaN
+		
+		// 2 hardcoded ranges
+		markw[range1start, range1end] = (abs(w[p] - avg1) < tol) ? 1 : NaN
+		markw[range2start, ] = (abs(w[p] - avg2) < tol) ? 1 : NaN
+	endfor
+	
+	
+	// combined (logical AND) mark wave
+	String combiname = StringFromList(numitems, markwlist)
+	Duplicate/O markw, $combiname
+	WAVE combiw = $combiname
+	
+	combiw = 1
+	
+	for (i=0; i < numitems; i += 1)
+		markname = StringFromList(i, markwlist)
+		WAVE markw = $markname
+		
+		combiw = (markw[p] != 1) ? NaN : combiw[p]
+	endfor	
+End
+
+
+Function AppendMarksToHeightPlot(wlist)
+	String wlist		// list of wave names to append
+	
+	
+	String colorlist = "0;0;0;"  // black
+	colorlist += "0;0;65280;"		// blue
+	colorlist += "0;52224;0;"		// green
+	
+	Variable numitems = ItemsInList(wlist)
+	Variable coloritems = ItemsInList(colorlist)
+	
+	Variable oldtracenum = ItemsInList(TraceNameList("", ";", 1))
+	
+	Variable ret = MapToForeGround()
+	if (ret < 0)
+		return -1
+	endif
+	
+	Variable i
+	String wname
+	Variable r, g, b
+	Variable currtrace
+	for (i=0; i < numitems; i += 1)
+		currtrace = oldtracenum + i
+		wname = StringFromList(i, wlist)
+		r = str2num(StringFromList(mod(i*3, coloritems), colorlist))
+		g = str2num(StringFromList(mod(i*3+1, coloritems), colorlist))
+		b = str2num(StringFromList(mod(i*3+2, coloritems), colorlist))
+		AppendToGraph/T/L/C=(r,g,b) $wname
+		ModifyGraph muloffset[currtrace]={0,(i+1)*10}
+		ModifyGraph mode[currtrace]=3, marker[currtrace]=18, msize[currtrace]=2
+	endfor
+	
+End
+
+
+// Averages waves from 2D wave given by wname.
+// Only averages marked waves, i.e. where marker wave has value 1
+// (Use e.g. MarkCurvesAroundAvg to generate marker waves)
+Function AverageMarkedCurves(wname, avgname, marker, [from, to])
+	String wname		// name of 2D wave with original curves
+	String avgname	// name of new average wave (1D)
+	String marker	// name of marker wave; must be same length as wname columns
+	Variable from, to	// optional variables to define the range of curves ("pixels")
+							// 		which to average
+	
+	from = ParamIsDefault(from) ? 0 : from
+	to = ParamIsDefault(to) ? 0 : to
+	
+	KillDataFolder/Z temp_averagemarkedcurves	// clear previous temp data
+	NewDataFolder/O temp_averagemarkedcurves
+	
+	WAVE markw = $marker
+	NVAR numfc = :internalvars:numCurves
+	NVAR numpts = :internalvars:FCNumPoints
+	WAVE/T fcmeta
+	
+	String tempname
+	Variable i
+	Variable lastfc
+	if (to == 0)
+		to = numfc-1
+	endif
+	for (i=from; i <= to; i += 1)
+		if (markw[i] != 1)
+			continue
+		endif
+		
+		tempname = ":temp_averagemarkedcurves:fc" + num2str(i)
+		
+		MakeTempCurve(tempname, wname, i)
+		SetScale/I x, 0, NumberByKey("rampsizeUsed", fcmeta[i]), $tempname
+		lastfc = i
+	endfor
+	
+	SetDataFolder temp_averagemarkedcurves
+	fWaveAverage(WaveList("*", ";", ""), "", 0, 0, avgname, "")
+	Duplicate/O $avgname, $("::" + avgname)
+	KillWaves $avgname
+	SetDataFolder ::
+	
+	WAVE avgw = $avgname
+	Redimension/N=(numpts) avgw
+	Variable avgrampsize = AvgAllRampSizeUsed()
+	SetScale/I x, 0, avgrampsize, avgw
+	
+	//KillDataFolder temp_averagemarkedcurves
+	
+	
+	Variable springConst = NumberByKey("springConst", fcmeta[lastfc])
+	// pN -> nm
+	avgw /= springConst
+	avgw /= 1000
+	
+	STRUCT CreateTSDReturn ret
+	CreateTSDWave(avgw, $"", ret)
+	
+	Duplicate/O ret.tsd, $(avgname + "_xtsd")
+	avgw *= springConst * 1000	
+End
+
+
 Function ExtractHardwallForce()
 	NVAR numfc = :internalvars:numCurves
 	Variable i
