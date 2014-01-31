@@ -36,7 +36,7 @@ Function LoopDFRFunc(f, dfpath, filter, [par1, par2])
 	for (i=0; i<CountObjects(dffullpath, 4); i+=1)
 		df = GetIndexedObjName(dffullpath, 4, i)
 		if(strlen(df)>0)
-			if (strlen(filter) <= 0 || strsearch(df, filter, 0, 2) >= 0)
+			if (strlen(filter) <= 0 || stringmatch(df, filter) == 1)
 				SetDataFolder $(dffullpath + df)
 				try
 					f()
