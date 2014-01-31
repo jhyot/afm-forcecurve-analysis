@@ -151,6 +151,7 @@ Function Analysis()
 	Make/N=(numcurves)/O deflsenserror_used = NaN
 	Make/N=(numcurves)/O deflsenserror_orig = NaN
 	Make/N=(numcurves)/O blnoise = NaN
+	Make/N=(numcurves)/O hardwallforce = NaN
 	
 	// Running analysis changes the "raw" data (rescales it in-place)
 	// Set flag immediately before analysis starts to warn the user if he re-runs the analysis
@@ -194,6 +195,12 @@ Function Analysis()
 			deflsenserror_used[i] = deflsensfit[i] - deflsensused[i]
 			deflsenserror_orig[i] = deflsensfit[i] - NumberByKey("deflSens", header)
 			blnoise[i] = NumberByKey("blNoiseRaw", header)
+			Variable hwpt = NumberByKey("hardwallPt", header)
+			if (numtype(hwpt) == 0 && hwpt >= 0 && hwpt < fcpoints)
+				hardwallforce[i] = fc[NumberByKey("hardwallPt", header)][i]
+			else
+				hardwallforce[i] = NaN
+			endif
 			
 			// Process retract curve
 			RetractTSD3(i)
