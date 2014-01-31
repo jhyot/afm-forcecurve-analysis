@@ -1,6 +1,12 @@
 #pragma rtGlobals=3		// Use modern global access method.
 
 
+
+Structure CalcEModReturn
+	WAVE coefs
+	WAVE wfit
+EndStructure
+
 Function Analysis()
 
 	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
@@ -1495,35 +1501,21 @@ End
 
 
 // Calculates E-modulus of each curve, based on Hertz contact model
-// Splits the curve at <fraction> between the hardwall point and brush contact point,
+// Splits the curve at <fraction> (initial guess for the fit)
+// between the hardwall point and brush contact point,
 // and fits individual Hertz model to each region.
-Function CalcHertzEMod(fraction)
-	Variable fraction		// number between 0 and 1; looking from the hardwall point
-								// (0.3 seems to work well)
+// (Final split point is also a fitted value)
+Function CalcHertzEModAll()	
 	
-	// ** Hardcoded intial guess coefficients, and constants (poisson number, tip radius)
-	Variable nu = 0.3
-	Variable R = 40e-9
-//	Make/N=5/D/FREE coefs1 = {nu, 0.5e6, R, 20, 0}
-//	Make/N=5/D/FREE coefs2 = {nu, 1e6, R, 10, 0}
-	Make/N=8/D/FREE coefs = {nu, .2e6, R, 20, 0, 1.5e6, 7, 100}
-	Make/T/O/FREE constr = {"K3"}
-	
-	
-	WAVE fc, fc_x_tsd, fc_z
+	WAVE fc, fc_x_tsd
 	WAVE/T fcmeta
-	Variable numcurves = numpnts(fc_z)
+	NVAR numcurves = :internalvars:numCurves
 	Make/O/N=(numcurves) emod1=NaN, emod2=NaN, emodh0=NaN, emodsplit=NaN
 	
 	NVAR fcpoints = :internalvars:FCNumPoints
-//	Make/N=(fcpoints/8, numcurves)/O fc_emod1fit = NaN
-//	Make/N=(fcpoints/8, numcurves)/O fc_emod2fit = NaN
-	Make/N=(fcpoints/4, numcurves)/O fc_emodfit = NaN
-	
-	
-	Variable bcontactpt = 0, bcontactx = 0
-	Variable hwpt = 0, hwx = 0
-	Variable splitpt = 0, splitx = 0
+	Variable rampsize = NumberByKey("rampsizeUsed", fcmeta[0])
+	Variable fitpointnum = round(fcpoints / rampsize * ksDeflSens_ContactLen*2)	
+	Make/N=(fitpointnum, numcurves)/O fc_emodfit = NaN
 	
 	Variable i = 0
 	for (i=0; i<numcurves; i+=1)
@@ -1533,88 +1525,88 @@ Function CalcHertzEMod(fraction)
 		Duplicate/FREE/O/R=[][i] fc_x_tsd, tsd
 		Redimension/N=(numpnts(w)) w
 		Redimension/N=(numpnts(tsd)) tsd
-//		Duplicate/FREE w, fit1
-//		Duplicate/FREE w, fit2
-//		fit1 = NaN
-//		fit2 = NaN
-		Duplicate/FREE w, wfit
-		wfit = NaN
 		
-		bcontactpt = NumberByKey("BrushContactPt", fcmeta[i])
-		hwpt = NumberByKey("HardwallPt", fcmeta[i])
-		if (numtype(hwpt) != 0 || numtype(bcontactpt) != 0)
-			print "[ERROR] Didn't find fitting limits at curve " + num2str(i)
+		STRUCT CalcEModReturn ret
+		Variable retval
+		retval = CalcHertzEMod(w, tsd, fcmeta[i], ret)
+		
+		if (retval < 0)
+			print "[ERROR] at curve " + num2str(i)
 			continue
-		endif
-		bcontactx = tsd[bcontactpt]
-		hwx = tsd[hwpt]
-		
-		// find split point
-		splitx = hwx + (bcontactx - hwx) * fraction
-		FindLevel/Q/P/R=[hwpt] tsd, splitx
-		splitpt = round(V_levelX)
-		
-		if (V_flag != 0)
-			print "[ERROR] Split point not found at curve " + num2str(i)
-			continue
-		endif
-		
-		Variable V_fitOptions = 4		// suppress fitting progress window
-		
-//		// fit region 1 (splitpoint to brush contact)
-//		coefs1[3] = bcontactx		// update initial guess for h_0
-//		Variable V_FitError = 0		// prevent abort on error
-//		FuncFit/Q/N/H="10101"/NTHR=1 hertz, coefs1, w[splitpt,bcontactpt] /X=tsd /D=fit1
-//		
-//		if (V_FitError != 0)
-//			print "[ERROR] Couldn't fit region 1 at curve " + num2str(i)
-//			fit1 = NaN
-//		else
-//			emod1[i] = coefs1[1]
-//			//fit1[] = hertz(coefs1, tsd[p])
-//		endif
-//		
-//		
-//		// fit region 2 (hardwall to splitpoint)
-//		coefs2[3] = (splitx + bcontactx)/2		// update initial guess for h_0
-//		V_FitError = 0		// prevent abort on error
-//		FuncFit/Q/N/H="10101"/NTHR=1 hertz, coefs2, w[hwpt, splitpt] /X=tsd /D=fit2
-//		
-//		if (V_FitError != 0)
-//			print "[ERROR] Couldn't fit region 2 at curve " + num2str(i)
-//			fit2 = NaN
-//		else
-//			emod2[i] = coefs2[1]
-//			//fit2[] = hertz(coefs2, tsd[p])
-//		endif
-
-		// fit both regions together
-		// update some initial coefs
-		coefs[3] = bcontactx
-		coefs[6] = splitx
-		coefs[7] = w[splitpt]
-		constr[0] = "K3 >= " + num2str(bcontactx)
-		Variable V_FitError = 0		// prevent abort on error
-		FuncFit/Q/N/H="10101000"/NTHR=1 twohertz, coefs, w[hwpt, bcontactpt] /X=tsd/D=wfit/C=constr
-		if (V_FitError != 0)
-			print "[ERROR] Couldn't do fit at curve " + num2str(i)
-			wfit = NaN
 		else
-			emod1[i] = coefs[1]
-			emod2[i] = coefs[5]
-			emodh0[i] = coefs[3]
-			emodsplit[i] = coefs[6]
+			emod1[i] = ret.coefs[1]
+			emod2[i] = ret.coefs[5]
+			emodh0[i] = ret.coefs[3]
+			emodsplit[i] = ret.coefs[6]
 		endif
-		
-//		Redimension/N=(fcpoints/8) fit1
-//		Redimension/N=(fcpoints/8) fit2
-//		fc_emod1fit[][i] = fit1[p]
-//		fc_emod2fit[][i] = fit2[p]
-//		fcmeta[i] = ReplaceNumberByKey("EModSplitFraction", fcmeta[i], fraction)
 
-		Redimension/N=(fcpoints/4) wfit
-		fc_emodfit[][i] = wfit[p]
+		fc_emodfit[][i] = ret.wfit[p]
 	endfor
+	
+	NVAR singlefc = :internalvars:singleFCs
+	NVAR rowsize = :internalvars:FVRowSize
+	if (!singlefc || (rowsize > 0))
+		Redimension/N=(rowsize,rowsize) emod1, emod2, emodh0, emodsplit
+	endif
+End
+
+
+Function CalcHertzEMod(w, tsd, meta, ret)
+	WAVE w		// force curve wave
+	WAVE tsd	// TSD wave
+	String meta		// fc metadata (header)
+	STRUCT CalcEModReturn &ret	// Struct for return values
+	
+	// ** Hardcoded intial guess coefficients, and constants (poisson number, tip radius)
+	Variable nu = 0.3
+	Variable R = 40e-9
+//	Make/N=5/D/FREE coefs1 = {nu, 0.5e6, R, 20, 0}
+//	Make/N=5/D/FREE coefs2 = {nu, 1e6, R, 10, 0}
+	Make/N=8/D/FREE coefs = {nu, .2e6, R, 20, 0, 1.5e6, 7, 0}
+	Make/T/O/FREE constr = {"K3"}
+	Variable splitfraction = .3
+	
+	Duplicate/FREE w, wfit
+	wfit = NaN
+	
+	Variable bcontactpt = NumberByKey("BrushContactPt", meta)
+	Variable hwpt = NumberByKey("HardwallPt", meta)
+	if (numtype(hwpt) != 0 || numtype(bcontactpt) != 0)
+		print "[ERROR] CalcHertzEMod: Didn't find fitting limits"
+		return -1
+	endif
+	Variable bcontactx = tsd[bcontactpt]
+	Variable hwx = tsd[hwpt]
+	
+	// find split point
+	Variable splitx = hwx + (bcontactx - hwx) * splitfraction
+	FindLevel/Q/P/R=[hwpt] tsd, splitx
+	Variable splitpt = round(V_levelX)
+	
+	if (V_flag != 0)
+		print "[ERROR] CalcHertzEMod: Split point not found"
+		return -1
+	endif
+	
+	Variable V_fitOptions = 4		// suppress fitting progress window
+
+	// update some initial coefs
+	coefs[3] = bcontactx
+	coefs[6] = splitx
+	coefs[7] = w[splitpt]
+	constr[0] = "K3 >= " + num2str(bcontactx)
+	Variable V_FitError = 0		// prevent abort on error
+	FuncFit/Q/N/H="10101000"/NTHR=1 twohertz, coefs, w[hwpt, bcontactpt] /X=tsd/D=wfit/C=constr
+	if (V_FitError != 0)
+		print "[ERROR] CalcHertzEMod: Couldn't do fit"
+		return -1
+	endif
+	
+	WAVE ret.coefs = coefs
+	WAVE ret.wfit = wfit
+	
+	return 0
+	
 End
 
 
