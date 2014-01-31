@@ -150,15 +150,16 @@ End
 
 // this is a "hack" function; before running it, make sure it really does
 // what you want (hardcoded values etc.)
-Function AutoLoadFCFolder()
-
+Function AutoLoadFCFolder(path)
+	String path
+	
 	String df = GetDataFolder(0)
 	String ptno = ""
 	SplitString/E="pt(\\d{3})_" df, ptno
 	
-	PathInfo exppath
+	PathInfo $path
 	if (!V_flag)
-		NewPath/Q exppath
+		NewPath/Q $path
 	endif
 	
 	// find correct folder
@@ -167,7 +168,7 @@ Function AutoLoadFCFolder()
 	String folderfound = ""
 	do
 		i += 1
-		foldername = IndexedDir(exppath, i, 1)
+		foldername = IndexedDir($path, i, 1)
 		
 		if (strlen(foldername) == 0)
 			// no more folders
@@ -187,16 +188,44 @@ Function AutoLoadFCFolder()
 	while (1)
 	
 	
-	// execute what you want within this folder
 	if (strlen(folderfound) > 0)
+		print "AutoLoadFCFolder: folder found: " + folderfound
+		
+		// execute what you want within this folder
+		NewDataFolder/O internalvars
 		Variable/G :internalvars:noDialogs = 1
-		LoadSingleFCFolder(folderfound)
-		ReadForceCurves()
-		recalcdeflsensall(8.6)
-		analysis()
+		LoadAndAnalyseAllFC(folderfound)
+		//LoadSingleFCFolder(folderfound)
+		//ReadForceCurves()
+		//recalcdeflsensall(8.6)
+		//analysis()
+		Variable/G :internalvars:noDialogs = 0
+	else
+		print "AutoLoadFCFolder: no folder found for df: " + df
 	endif
-	
 End
+
+// Creates datafolders from list and runs AutoLoadFCFolder() in each folder.
+// Creates new datafolders in current datafolder.
+Function AutoLoadListOfFolders(list)
+	String list	// ; -separated list of datafolder names
+	
+	NewPath/Q autofolderpath
+	
+	Variable numdfs = ItemsInList(list)
+	
+	Variable i
+	String df
+	for (i=0; i < numdfs; i += 1)
+		df = StringFromList(i, list)
+		NewDataFolder/O/S $df
+		AutoLoadFCFolder("autofolderpath")
+		SetDataFolder ::
+	endfor
+	
+	KillPath/Z autofolderpath
+End
+
 
 // "hack" function to traverse rate sud-datafolders in <df> and run functions on them
 // beware of possible hardcoded values etc.
