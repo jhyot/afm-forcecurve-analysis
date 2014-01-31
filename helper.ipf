@@ -671,3 +671,32 @@ Function PrintParams(params, idx)
 //	endif
 	
 End
+
+
+
+Function GetAllRampSizeUsed()
+	
+	WAVE/T fcmeta
+	
+	Variable numfc = numpnts(fcmeta)
+	
+	Make/O/N=(numfc) rampsizeused = NaN
+	
+	Variable i
+	for (i=0; i < numfc; i += 1)
+		rampsizeused[i] = NumberByKey("rampsizeUsed", fcmeta[i])
+	endfor
+End
+
+
+Function AvgAllRampSizeUsed()
+	WAVE/T fcmeta
+	Variable numfc = numpnts(fcmeta)
+	
+	Variable avg = 0
+	Variable i
+	for (i=0; i < numfc; i += 1)
+		avg += NumberByKey("rampsizeUsed", fcmeta[i])
+	endfor
+	return avg / numfc
+End
