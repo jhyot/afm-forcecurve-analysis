@@ -844,3 +844,19 @@ Function BinSizeSuggestion(wname)
 	
 	return BinSizeFreedmanDiaconis(wname)
 End
+Function ExtractHardwallForce()
+	NVAR numfc = :internalvars:numCurves
+	Variable i
+	WAVE/T fcmeta
+	WAVE fc
+	Make/N=(numfc)/O hardwallforce = NaN
+	Variable hardwallpt
+	for (i=0; i < numfc; i +=1)
+		hardwallpt = NumberByKey("hardwallpt", fcmeta[i])
+		if (numtype(hardwallpt) == 0)
+			hardwallforce[i] = fc[hardwallpt][i]
+		endif
+	endfor
+End
+
+
