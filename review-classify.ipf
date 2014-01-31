@@ -793,3 +793,4 @@ Function MarkPixels(filterw, del, color)
 		endif
 	endfor
 End
+
