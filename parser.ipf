@@ -393,8 +393,6 @@ Function ParseFCHeader(filename, headerwave, titleswave, headerData)
 	Variable result, subGroupOffset
 	headerData = ""
 	
-	NVAR fcpoints_const = :internalvars:FCNumPoints
-	
 	result = ReadHeaderLines(fileName, headerwave)
 	if (result != 0)
 		Print fileName + ": Did not find header end"
