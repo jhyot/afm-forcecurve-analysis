@@ -1320,18 +1320,29 @@ Function DrawPointMarkerColor(graph, xpos, ypos, del, color)
 		return -1
 	endif
 	
+	if (del == 1)
+		DeletePointMarker(graph)
+	endif
+	
 	SetDrawLayer/W=$graph ProgFront
 	String lastLayer = S_name
-	
-	if (del == 1)
-		// delete previous markers (and other drawings)
-		DrawAction/W=$graph delete
-	endif
 	
 	if (numtype(xpos) == 0 && numtype(ypos) == 0)
 		SetDrawEnv/W=$graph xcoord=prel, ycoord=prel, linethick=0, fillfgc=(col_r,col_g,col_b)
 		DrawRect/W=$graph (xpos+0.3)/rowsize, 1-(ypos+0.3)/rowsize,  (xpos+0.7)/rowsize, 1-(ypos+0.7)/rowsize
 	endif
+	
+	SetDrawLayer/W=$graph $lastLayer
+End
+
+
+Function DeletePointMarker(graph)
+	String graph
+	
+	SetDrawLayer/W=$graph ProgFront
+	String lastLayer = S_name
+	
+	DrawAction/W=$graph delete
 	
 	SetDrawLayer/W=$graph $lastLayer
 End
