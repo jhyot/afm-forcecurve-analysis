@@ -904,6 +904,11 @@ Function AnalyseBrushHeight4(index, wHeights)
 			break
 	endswitch
 	
+	// User defined forcing of last good pt
+	if (ksMaxGoodPt >= 0)
+		lastGoodPt = min(lastGoodPt, ksMaxGoodPt)
+	endif
+	
 	header = ReplaceNumberByKey("lastGoodPt", header, lastGoodPt)
 	
 	// ignore curve end in certain operations;
