@@ -1394,13 +1394,10 @@ Function RecalcDeflSens(dsens, idx)
 	
 	
 	Variable springconst = NumberByKey("springConst", fcmeta[idx])
-	Variable olddsens = NumberByKey("deflSensUsed", fcmeta[idx])
 	NVAR fcpoints = :internalvars:FCNumPoints
 	NVAR zsensloaded = :internalvars:isZsensLoaded
 	
-	// convert from pN to V
-	w /= springconst * 1000 * olddsens
-	rw /= springconst * 1000 * olddsens
+	ConvertForceToV(w, fcmeta[idx])
 	
 	// V -> nm
 	w *= dsens
