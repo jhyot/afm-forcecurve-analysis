@@ -86,6 +86,14 @@ Function genf()
 End
 
 
+Function ChangeColorAccordingToFolder(index)
+	Variable index		// trace index
+	String list = "r29:65280,32768,58880;r09:32768,40704,65280;r03:65280,32512,16384;"
+	list += "r01:0,52224,26368;r003:52224,52224,0"
+	Variable r, g, b
+	sscanf StringByKey(GetDataFolder(0), list), "%d,%d,%d", r, g, b
+	ModifyGraph rgb[index]=(r,g,b)
+End
 
 // this is a "hack" function; before running it, make sure it really does
 // what you want (hardcoded values etc.)
