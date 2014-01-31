@@ -61,6 +61,8 @@ End
 
 Function genf()
 	// Generic function, edit content, pass to LoopDFRFunc
+	
+	print GetDataFolder(1)
 		
 //	Variable/G :internalvars:noDialogs = 1
 //	Analysis()
@@ -68,21 +70,40 @@ Function genf()
 //	CalcRelStiffness(50,150)
 //	Variable/G :internalvars:noDialogs = 0
 	
+//	Variable/G :internalvars:noDialogs = 1
+//	NVAR deflfix
+//	RecalcDeflSensAll(deflfix)
+//	Analysis()
+//	Variable/G :internalvars:noDialogs = 0
+	
 	//BrushHisto(2)
 	//DoWindow/K kwtopwin
 	
-	//print GetDataFolder(1)
 	//CalcHertzEMod(0.3)
 	
-	//MakeHisto("emod1_full", "emod1_hist", .04e6, binmin=-.08e6)
-	//MakeHisto("emod2_full", "emod2_hist", .15e6)
-	MakeHisto("brushheights", "", 2, to=40, binmin=-10)
-	MakeHisto("relstiffness", "", .2, to=40, binmin=-10)	
+	//MakeHisto("emod1_ring", "", .04e6, binmin=-.08e6)
+	//MakeHisto("emod2_ring", "", .15e6)
+	MakeHisto("brushheights_hole", "brushheights_hist", 1, binmin=-10)
+	MakeHisto("relstiffness_hole", "relstiffness_hist", .15)	
 	//MakeHisto("brushheights", "", 2, from=100)
-	//MakeHisto("relstiffness", "", .2, from=100)
 	
-	//Duplicate/O $"emod1", emod1_ring
-	//Duplicate/O $"emod2", emod2_ring
+	//Duplicate/O $"emodsplit", emodsplit_ring
+	
+	//AutoLoadFCFolder()
+	
+	//print BinSizeFreedmanDiaconis("emod2_hole"), BinSizeFreedmanDiaconis("emod2_ring")
+	
+	
+	//WAVE/T fcmeta
+	//FitDeflSensAndMakeTSD($"fc_aroundmu_avg_hole", fcmeta[2])
+	
+	//Concatenate/NP {$"hardwallforce_hole"}, $"::allrates:hardwallforce_hole"
+	//Concatenate/NP {$"hardwallforce_ring"}, $"::allrates:hardwallforce_ring"
+	
+//	AppendToGraph $"emod2_ring_hist"
+//	Variable num = ItemsInList(TraceNameList("", ";", 1)) - 1
+//	ModifyGraph mode[num]=3, marker[num]=18, msize[num]=2
+//	ChangeColorAccordingToFolder(num)
 End
 
 
