@@ -737,6 +737,7 @@ Function PlotXsectFC()
 	ModifyGraph freePos(fc)={0,kwFraction}, freePos(fric)={0,kwFraction}
 	ModifyGraph axisEnab(left)={.75,1}
 	ModifyGraph axisEnab(fc)={.38,.72}, axisEnab(fric)={0,.34}
+	ModifyGraph zero(bottom)=1
 	
 	PlotXsectFC_setzoom()
 	
