@@ -1379,3 +1379,17 @@ Function CreateLegendFromFolders(cols)
 	
 	TextBox/C/N=legend0 s
 End
+
+
+Function AddLogLin(state)
+	Variable state	// 1: toolbar on	; 0: toolbar off
+	if (state == 1)
+		ControlBar/T 30
+		Button xswitchb, disable=0, title="X=lin", size={70,25}, pos={20,2}, proc=LogLin_switch
+		Button yswitchb, disable=0, title="Y=lin", size={70,25}, pos={20,2}, proc=LogLin_switch
+	else
+		ControlBar/T 0
+		Button xswitchb, disable=3
+		Button yswitchb, disable=3
+	endif
+End
