@@ -579,6 +579,11 @@ Function MakeHisto(wname, histname, binsize, [binmin, edge, from, to])
 	Make/O/N=(bins) $histname = 0
 	WAVE h = $histname
 	Histogram/P/B={binmin, binsize, bins} w, h
+	String notestr = "Created-by-MakeHisto;"
+	notestr += "flags:P;source:" + wname + ";binmin:" + num2str(binmin) + ";"
+	notestr += "bins:" + num2str(bins) + ";binsize:" + num2str(binsize) + ";"
+	notestr += "edge:" + num2str(edge) + ";from:" + num2str(from) + ";to:" + num2str(to) + ";"
+	Note/K h, notestr
 End
 
 
