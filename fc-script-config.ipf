@@ -12,9 +12,10 @@ StrConstant ksVersionReq = "0x07300000,0x08100000,0x08150300,0x08150304,0x090001
 // Points per FC
 // only thoroughly tested with 4096, but should work with 2048 etc.
 // (too few points may cause bad curve transformations and analysis)
-Constant ksFCPoints = 4096
 Constant ksFixPointNum = 0	// 0: read number of points from header;
-									// 1: use above constant (gives error if number in header differs)
+									// 1: use constant below (gives error if number in header differs)
+Constant ksFCPoints = 4096
+
 
 // Force curves per row.
 // Tested with 32 and 16 pixels per row
@@ -41,7 +42,7 @@ Constant ksDeflSens_ContactLen = 25				// ca. contact length (piezo ramp length,
 Constant ksDeflSens_EdgeFraction = 0.02	// Defines end of hardwall part, the closer to 0, the less of curve
 													// gets fitted (useful values 0.01 - 0.1)
 
-// Further Analysis parameters
+// Further Analysis flags
 Constant ksFixDefl = 1 				// Deflection sensitivity; 0: Fit for each curve; 1: Use fixed from header
 Constant ksXDataZSens = 1				// 0: don't use Zsensor data as X axis; 1: use Zsensor data where available;
 											// 2: force use of Zsensor data; i.e. abort when not available
