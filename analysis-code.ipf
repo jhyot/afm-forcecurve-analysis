@@ -8,6 +8,11 @@ Structure FitDeflReturn
 	Variable linefit_slope		// ( == -1/deflsensfit)
 EndStructure
 
+Structure CreateTSDReturn
+	WAVE tsd
+	Variable shift
+Endstructure
+
 Structure CalcEModReturn
 	WAVE coefs
 	WAVE wfit
@@ -889,7 +894,7 @@ Function AnalyseBrushHeight4(index, wHeights)
 	
 	WAVE fc
 	WAVE fc_sensfit, fc_x_tsd, fc_expfit, fc_smth, fc_smth_xtsd
-	Make/FREE/N=(fcpoints) w, xTSD, expfit, smth, smthXTSD
+	Make/FREE/N=(fcpoints) w, expfit, smth
 	Make/FREE/N=(fcpoints/8) sensfit
 	
 	// copy data from 2d array to temporary wave. copy back after all analysis
@@ -1029,36 +1034,21 @@ Function AnalyseBrushHeight4(index, wHeights)
 	Duplicate/O w, smth
 	Smooth/E=3 SmoothCurvePt, smth
 	
-	// Create x values wave for tip-sample-distance
-	// Write displacement x values
-	if (zsensloaded && ksXDataZSens > 0)
-		xTSD[] = wzsens[p]
-	else
-		xTSD = rampsize/fcpoints * p
-	endif
 	
-	Duplicate/O xTSD, smthXTSD
-	// Subtract deflection to get tip-sample-distance
-	xTSD += w
-	smthXTSD += smth
+	STRUCT CreateTSDReturn rettsd
+	CreateTSDWave(w, wzsens, rettsd)
+	header = ReplaceNumberByKey("horizShifted", header, rettsd.shift)
+	WAVE xTSD = rettsd.tsd
+	
+	CreateTSDWave(smth, wzsens, rettsd)
+	WAVE smthXTSD = rettsd.tsd
 	
 	// Change y scale on all curves to pN
 	Variable springConst = NumberByKey("springConst", header)
 	w *= springConst * 1000
 	sensfit *= springConst * 1000
 	smth *= springConst * 1000
-
 	SetScale d 0,0,"pN", w, sensfit, smth
-	
-	Variable zeroRange = round(fcpoints / rampsize * ksDeflSens_ContactLen/2)
-	//Variable zeroRange = 0.025 * fcpoints
-	// Shift hard wall contact point to 0 in xTSD
-	WaveStats/R=[3,zeroRange]/Q xTSD
-	xTSD -= V_avg
-	header = ReplaceNumberByKey("horizShifted", header, V_avg)
-	
-	WaveStats/R=[3,zeroRange]/Q smthXTSD
-	smthXTSD -= V_avg
 	
 	// write back curves to 2d wave
 	fc[][index] = w[p]
@@ -1066,9 +1056,7 @@ Function AnalyseBrushHeight4(index, wHeights)
 	fc_x_tsd[][index] = xTSD[p]
 	fc_smth[][index] = smth[p]
 	fc_smth_xtsd[][index] = smthXTSD[p]
-		
-	// function not finished
-	//Variable height = CalcBrushHeight(w, header)
+
 	
 	// Extract contact point as point above noise.
 	// Noise = StDev from first part of baseline (as found above)
@@ -1141,6 +1129,40 @@ Function FitDeflectionSensitivity(w, meta, wzsens, ret)
 	ret.linefit_slope = W_coef[1]
 	ret.deflsensfit = -1/W_coef[1]
 End
+
+// Create tip-sample-distance wave
+Function CreateTSDWave(w, wzsens, ret)
+	WAVE w								// curve for y values (unit scaling: nm)
+	WAVE/Z wzsens						// if not empty: use this wave for x data
+										//		(no checking for validity here)
+	STRUCT CreateTSDReturn &ret	// return value structure, members:
+										//		tsd: created tsd WAVE
+										//		shift: horiz shift to zero hardwall
+	
+	Variable rampsize = pnt2x(w, numpnts(w)-1)
+	NVAR fcpoints = :internalvars:FCNumPoints
+	Make/FREE/N=(fcpoints) tsd
+	
+	if (WaveExists(wzsens))
+		tsd = wzsens[p]
+	else
+		tsd = rampsize/fcpoints * p
+	endif
+	
+	// Subtract deflection to get tip-sample-distance
+	tsd += w
+
+	Variable zeroRange = round(fcpoints / rampsize * ksDeflSens_ContactLen/2)
+
+	// Shift hard wall contact point to 0 in TSD
+	WaveStats/R=[3,zeroRange]/Q tsd
+	tsd -= V_avg
+	
+	WAVE ret.tsd = tsd
+	ret.shift = V_avg
+End
+
+
 // Function not done, not yet in use
 Function CalcBrushHeight(w, wsmth, wsmth_xtsd, header)
 	WAVE w, wsmth, wsmth_xtsd
