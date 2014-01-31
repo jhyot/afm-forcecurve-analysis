@@ -374,6 +374,21 @@ Function PoolFoldersFromTable(wname, [edge, from, to])
 	from = ParamIsDefault(from) ? 0 : from
 	to = ParamIsDefault(to) ? 0 : to
 	
+	PoolFoldersFromTableNamed(wname, wname, edge=edge, from=from, to=to)
+	
+	return 0
+End
+
+
+Function PoolFoldersFromTableNamed(wname, poolname, [edge, from, to])
+	String wname
+	String poolname		// name for pooled wave
+	Variable edge, from, to
+	
+	edge = ParamIsDefault(edge) ? 0 : edge
+	from = ParamIsDefault(from) ? 0 : from
+	to = ParamIsDefault(to) ? 0 : to
+	
 	WAVE/T/Z pool
 	
 	if (!WAVEExists(pool))
@@ -393,7 +408,7 @@ Function PoolFoldersFromTable(wname, [edge, from, to])
 			list += pool[i][j] + ";"
 		endfor
 		WAVE wpool = PoolData(list, wname, edge=edge, from=from, to=to)
-		Duplicate/O wpool, $(":" + pool[i][0] + ":" + wname)
+		Duplicate/O wpool, $(":" + pool[i][0] + ":" + poolname)
 	endfor
 	
 	return 0
