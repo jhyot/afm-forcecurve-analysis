@@ -1856,3 +1856,21 @@ Function CurvesAreLoaded()
 	return 0
 End
 
+
+
+
+
+// Code test reference values:
+// ===========================
+// 
+// *** Sample Auring39-PEG20k; pt015 (ring2, r03)
+// * Brush height:
+// DeflSensUsed = 9.8
+// Bheight = 22.6759 +- 3.03199
+//	* TwoHertzEmod (ca. value; fits seem to vary slightly):
+//	Emod1 = 134789 +- 54213.8
+//	Emod2 = 1.05179e+06 +- 238347
+//	Emodsplit = 9.38102 +- 1.97516
+
+
+
