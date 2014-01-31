@@ -1044,7 +1044,14 @@ End
 // Print the name of the data folder onto the graph
 Function PutDFNameOnGraph()
 	String df = TidyDFName(GetGraphDF())
-	TextBox/C/N=dfname/F=0/A=LB/X=.5/Y=.1/E=2 "\\Zr085" + df
+	PutLabelBottomLeft(df, "dfname")
+End
+
+Function PutLabelBottomLeft(lbl, name)
+	String lbl
+	String name
+
+	TextBox/C/N=$name/F=0/A=LB/X=.5/Y=.1/E=2 "\\Zr085" + lbl
 End
 
 
