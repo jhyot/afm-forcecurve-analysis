@@ -1459,11 +1459,11 @@ Function CalcRelStiffness(lower, upper)
 	Variable lower, upper	// lower and upper force limits (pN) for
 								// linear relative stiffness calculation
 	
-	WAVE fc, fc_z
+	WAVE fc
 	WAVE/T fcmeta
 	Variable upperz = 0
 	Variable lowerz = 0
-	Variable numcurves = numpnts(fc_z)
+	NVAR numcurves = :internalvars:numCurves
 	Make/O/N=(numcurves) relstiffness = 0, relstiffness_loz = 0, relstiffness_hiz = 0
 	
 	NVAR fcpoints = :internalvars:FCNumPoints
@@ -1487,6 +1487,12 @@ Function CalcRelStiffness(lower, upper)
 		fcmeta[i] = ReplaceNumberByKey("RelStiffLoF", fcmeta[i], lower)
 		fcmeta[i] = ReplaceNumberByKey("RelStiffHiF", fcmeta[i], upper)
 	endfor
+	
+	NVAR singlefc = :internalvars:singleFCs
+	NVAR rowsize = :internalvars:FVRowSize
+	if (!singlefc || (rowsize > 0))
+		Redimension/N=(rowsize,rowsize) relstiffness, relstiffness_loz, relstiffness_hiz
+	endif	
 End
 
 
