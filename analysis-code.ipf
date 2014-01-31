@@ -1,6 +1,12 @@
 #pragma rtGlobals=3		// Use modern global access method.
 
 
+Structure FitDeflReturn
+	Variable hardwallpt
+	Variable deflsensfit
+	Variable linefit_interc
+	Variable linefit_slope		// ( == -1/deflsensfit)
+EndStructure
 
 Structure CalcEModReturn
 	WAVE coefs
@@ -927,6 +933,7 @@ Function AnalyseBrushHeight4(index, wHeights)
 		rampsize = V_max/lastGoodPtMargin*fcpoints
 	else
 		rampsize = NumberByKey("rampSize", header)
+		WAVE/Z wzsens = $""
 	endif
 	header = ReplaceNumberByKey("rampSizeUsed", header, rampsize)
 	
@@ -986,41 +993,13 @@ Function AnalyseBrushHeight4(index, wHeights)
 	
 	
 	// Fit deflection sensitivity
-	
-	Variable SmoothCurvePt = fcpoints / rampsize * ksDeflSens_ContactLen
-	// needs odd number; "round" to next odd
-	SmoothCurvePt = RoundToOdd(SmoothCurvePt)
-	
-	Variable SmoothDerivPt = fcpoints / rampsize * ksDeflSens_ContactLen/2
-	SmoothDerivPt = RoundToOdd(SmoothDerivPt)
-	
-	Duplicate/O/R=[0,lastGoodPtMargin] w, w1
-	Smooth/E=3/B SmoothCurvePt, w1
-	Duplicate/O/R=[0,lastGoodPtMargin] w, w2
-	Differentiate w1/D=w2
-	Duplicate/O/R=[0,lastGoodPtMargin] w2, w3
-	Smooth/M=0 SmoothDerivPt, w3
-	WaveStats/Q w3
-	Variable AvgBox = round(fcpoints / rampsize * ksDeflSens_ContactLen/10)
-	AvgBox = max(AvgBox, 1)
-	EdgeStats/Q/A=(AvgBox)/P/R=[V_minRowLoc, blFitStart]/F=(ksDeflSens_EdgeFraction) w3
-	
-	Variable hardwallPt = round(V_EdgeLoc1)
-	header = ReplaceNumberByKey("hardwallPt", header, hardwallPt)
-	
-	if (zsensloaded && ksXDataZSens > 0)
-		CurveFit/NTHR=1/Q line  w[3,hardwallPt]/X=wzsens
-	else
-		CurveFit/NTHR=1/Q line  w[3,hardwallPt]
-	endif
-
-	SetScale/I x 0, (rampsize/8), "nm", sensfit
-	sensfit = W_coef[0] + W_coef[1]*x
-	
-	// use fitted sens by default, can be modified below
-	Variable deflSens = -1/W_coef[1]
-	
+	STRUCT FitDeflReturn ret
+	FitDeflectionSensitivity(w, header, wzsens, ret)
+	Variable deflSens = ret.deflsensfit
+	header = ReplaceNumberByKey("hardwallPt", header, ret.hardwallpt)	
 	header = ReplaceNumberByKey("deflSensFit", header, deflSens)
+	SetScale/I x 0, (rampsize/8), "nm", sensfit
+	sensfit = ret.linefit_interc + ret.linefit_slope*x
 	
 	if (ksFixDefl == 1)
 		// use saved defl sens from header.
@@ -1044,6 +1023,9 @@ Function AnalyseBrushHeight4(index, wHeights)
 	sensfit *= deflSens
 	
 	// Binomially smoothed curve for contact point determination
+	Variable SmoothCurvePt = fcpoints / rampsize * ksDeflSens_ContactLen
+	// operations below need odd number
+	SmoothCurvePt = RoundToOdd(SmoothCurvePt)
 	Duplicate/O w, smth
 	Smooth/E=3 SmoothCurvePt, smth
 	
@@ -1112,6 +1094,53 @@ Function AnalyseBrushHeight4(index, wHeights)
 End
 
 
+Function FitDeflectionSensitivity(w, meta, wzsens, ret)
+	WAVE w							// curve which is fitted; y-scaling in Volt
+	String meta					// curve metadata
+	WAVE/Z wzsens					// if not empty: use this wave for x data
+									//		(no checking for validity here)
+	STRUCT FitDeflReturn &ret	// return values; members:
+									//		hardwallpt
+									//		deflsensfit
+									//		linefit_interc
+									//		linefit_slope
+	
+	NVAR fcpoints = :internalvars:FCNumPoints
+	Variable lastGoodPtMargin = 0.8 * NumberByKey("lastGoodPt", meta)
+	Variable rampsize = pnt2x(w, numpnts(w)-1)
+	Variable blFitStart = NumberByKey("blFitStart", meta)
+	
+	Variable SmoothCurvePt = fcpoints / rampsize * ksDeflSens_ContactLen
+	// operations below need odd number
+	SmoothCurvePt = RoundToOdd(SmoothCurvePt)
+	
+	Variable SmoothDerivPt = fcpoints / rampsize * ksDeflSens_ContactLen/2
+	SmoothDerivPt = RoundToOdd(SmoothDerivPt)
+	
+	Duplicate/FREE/O/R=[0,lastGoodPtMargin] w, w1
+	Smooth/E=3/B SmoothCurvePt, w1
+	Duplicate/FREE/O/R=[0,lastGoodPtMargin] w, w2
+	Differentiate w1/D=w2
+	Duplicate/FREE/O/R=[0,lastGoodPtMargin] w2, w3
+	Smooth/M=0 SmoothDerivPt, w3
+	WaveStats/Q w3
+	Variable AvgBox = round(fcpoints / rampsize * ksDeflSens_ContactLen/10)
+	AvgBox = max(AvgBox, 1)
+	EdgeStats/Q/A=(AvgBox)/P/R=[V_minRowLoc, blFitStart]/F=(ksDeflSens_EdgeFraction) w3
+	
+	ret.hardwallPt = round(V_EdgeLoc1)
+	
+	if (WAVEExists(wzsens))
+		CurveFit/NTHR=1/Q line  w[3,ret.hardwallPt]/X=wzsens
+	else
+		CurveFit/NTHR=1/Q line  w[3,ret.hardwallPt]
+	endif
+
+	WAVE W_coef
+	ret.linefit_interc = W_coef[0]
+	ret.linefit_slope = W_coef[1]
+	ret.deflsensfit = -1/W_coef[1]
+End
 // Function not done, not yet in use
 Function CalcBrushHeight(w, wsmth, wsmth_xtsd, header)
 	WAVE w, wsmth, wsmth_xtsd
