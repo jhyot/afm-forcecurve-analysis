@@ -442,6 +442,7 @@ Function MakeTempCurve(name, orig, idx)
 	Duplicate/O/R=[][idx] fc, $name
 	WAVE dup = $name
 	Redimension/N=(numpnts(dup)) dup
+	Note dup, "orig:" + num2str(idx)
 End
 
 
