@@ -49,11 +49,17 @@ Function Analysis()
 	
 	Variable i, t0=ticks
 	
+	if (CurvesAreLoaded() == 0)
+		String errmsg = "[ERROR] Curves have not been loaded from files. "
+		errmsg += "Use \"Select / Load Curves\" from menu first."
+		print errmsg
+		return -1
+	endif
+	
 	SVAR selectionwave = :internalvars:selectionwave
+	WAVE sel=$selectionwave
 	
 	WAVE retractfeature
-
-	WAVE sel=$selectionwave
 
 	WAVE/T fcmeta
 	WAVE fc, rfc
@@ -1834,3 +1840,19 @@ Function RoundToOdd(a)
 	
 	return a
 End
+
+
+// Checks whether curves have been selected and loaded from raw files into waves.
+// Returns 0 if not loaded, 1 if they have been loaded.
+Function CurvesAreLoaded()
+	SVAR/Z selectionwave = :internalvars:selectionwave
+	if (SVAR_Exists(selectionwave))
+		WAVE/Z sel=$selectionwave
+		if (WAVEExists(sel))
+			return 1
+		endif
+	endif
+	
+	return 0
+End
+
