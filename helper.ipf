@@ -700,3 +700,14 @@ Function AvgAllRampSizeUsed()
 	endfor
 	return avg / numfc
 End
+
+
+Function MedianFilterMap(map)
+	String map
+	
+	SaveBackupWave(map, "medianfilt")
+	matrixfilter/N=3/P=1 median $map
+	matrixfilter/N=3 nanzapmedian $map
+
+End
+
