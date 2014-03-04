@@ -763,7 +763,7 @@ Function MarkClassifiedPixels()
 	
 	WAVE classify
 	
-	MarkPixels(classify, 1, 1)
+	MarkPixels(classify, 1, 2)
 End
 
 
