@@ -711,3 +711,15 @@ Function MedianFilterMap(map)
 
 End
 
+
+Function ClassifyHistoScaled(dist)
+	Variable dist	// 1 pixel distance in nm (calculate e.g. 500nm/32px)
+	
+	Duplicate/O $"classify_disthisto_norm", classify_disthisto_norm_scaled
+	SetScale/P x, 0, dist, "nm" classify_disthisto_norm_scaled
+	
+	Display classify_disthisto_norm_scaled
+	Execute/Q "escapefraction_histo()"
+	
+End
+
