@@ -585,8 +585,10 @@ Function ClassifyCurves_ShowCurves()
 	Variable del = 0		// Draw first marker without deleting old one so that user sees center marker
 	Variable i = 0
 	Variable lastnotignored = 0
+	Variable numAutoIgnored = 0
 	for (i=0; i < numcurves; i+=1)
 		if (imwave[i] < igntopo)
+			numAutoIgnored += 1
 			continue
 		endif
 		DoWindow/K tmp_classifygraph
@@ -627,6 +629,8 @@ Function ClassifyCurves_ShowCurves()
 		
 		del = 1
 	endfor
+	
+	print "Number of automatically ignored curves: " + num2str(numAutoIgnored)
 	
 	DoWindow/K tmp_classifygraph
 	
@@ -703,6 +707,7 @@ Function Classify_CalcRadius()
 	Variable pixelY = 0	
 	Variable i
 	Variable r
+	Variable numNaNs = 0
 	for (i=0; i < numcurves; i += 1)	
 		pixelX = mod(i,rowsize)
 		pixelY = floor(i/rowsize)
@@ -714,8 +719,12 @@ Function Classify_CalcRadius()
 				// Feature was marked
 				classify_dist[i] = classify_alldist[i]
 			endif
+		else
+			numNaNs += 1
 		endif
 	endfor
+	
+	print "Number of curves excluded from classification (incl. outside of ring): " + num2str(numNaNs)
 	
 	Variable pixelsize = NumberByKey("scansize", note(image)) / rowsize
 	
