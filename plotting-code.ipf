@@ -399,7 +399,8 @@ Function PlotFC_plotdata(index)
 	
 	PlotFC_setzoom(zoomlvl)	
 	
-	WAVE brushheights, deflsensfit
+	WAVE brushheights
+	WAVE/Z deflsensfit
 	NVAR rowsize = :internalvars:FVRowSize
 	SVAR iwavename = :internalvars:imagewave
 	WAVE iwave = $iwavename
@@ -410,7 +411,9 @@ Function PlotFC_plotdata(index)
 
 //	if (mode==0)
 		sprintf text, "%s\rBrush height: %.2f nm", text, brushheights[index]
-		sprintf text, "%s\rDeflsens: %.2f nm", text, deflsensfit[index]
+		if (WaveExists(deflsensfit))
+			sprintf text, "%s\rDeflsens: %.2f nm", text, deflsensfit[index]
+		endif
 //	endif
 	TextBox/C/N=fcinfobox/A=RT (text)
 	
