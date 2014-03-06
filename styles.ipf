@@ -59,3 +59,21 @@ Proc ratecolors() : GraphStyle
 	ModifyGraph/Z rgb[3]=(0,52224,26368),rgb[4]=(52224,52224,0)
 	ModifyGraph/Z rgb[5]=(65280,65280,32768),rgb[6]=(65280,49152,16384)
 EndMacro
+
+
+
+Proc escapefraction_histo() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z mode=5
+	ModifyGraph/Z rgb=(0,0,65280)
+	ModifyGraph/Z hbFill=2
+	ModifyGraph/Z useBarStrokeRGB=1
+	ModifyGraph/Z fSize=12
+	ModifyGraph/Z standoff=0
+	ModifyGraph/Z tickUnit(bottom)=1
+	Label/Z left "fraction of curves with escape"
+	Label/Z bottom "distance from ring center (nm)"
+	SetAxis/Z/E=1 left 0,0.6
+	SetAxis/Z bottom 0,300
+EndMacro
+
