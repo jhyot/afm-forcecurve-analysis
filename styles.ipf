@@ -68,8 +68,9 @@ Proc escapefraction_histo() : GraphStyle
 	ModifyGraph/Z rgb=(0,0,65280)
 	ModifyGraph/Z hbFill=2
 	ModifyGraph/Z useBarStrokeRGB=1
-	ModifyGraph/Z fSize=12
+	ModifyGraph/Z fSize=14
 	ModifyGraph/Z standoff=0
+	ModifyGraph/Z lblLatPos(left)=8
 	ModifyGraph/Z tickUnit(bottom)=1
 	Label/Z left "fraction of curves with escape"
 	Label/Z bottom "distance from ring center (nm)"
