@@ -755,7 +755,6 @@ End
 
 Function MarkClassifiedPixels()
 	if (!IsDataLoaded())
-	
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -763,6 +762,21 @@ Function MarkClassifiedPixels()
 	WAVE classify
 	
 	MarkPixels(classify, 1, 2)
+End
+
+Function MarkClassifiedAndExcludedPixels()
+	if (!IsDataLoaded())
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
+	
+	WAVE classify
+	Duplicate/FREE/O classify, classify_excluded
+	
+	classify_excluded[] = numtype(classify[p]) == 2 ? 1 : 0
+	
+	MarkPixels(classify, 1, 2)
+	MarkPixels(classify_excluded, 0, 1)
 End
 
 

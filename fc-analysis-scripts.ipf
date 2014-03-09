@@ -61,6 +61,7 @@ Menu "Force Map Analysis"
 		"-"
 		"Classify Curves", ClassifyCurves()
 		"Mark classified", MarkClassifiedPixels()
+		"Mark classified and excluded", MarkClassifiedAndExcludedPixels()
 	End
 	Submenu "Helper"
 		"Brush Histogram", BrushHisto(1)
