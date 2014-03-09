@@ -4,8 +4,7 @@
 
 Function FlagCurves()
 	
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
+	if (!IsDataLoaded())
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -143,9 +142,7 @@ End
 
 
 Function ReviewCurvesAll()
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
-	
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
+	if (!IsDataLoaded())
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -173,9 +170,7 @@ End
 
 
 Function ReviewCurvesFlagged()
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
-	
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
+	if (!IsDataLoaded())
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -218,9 +213,7 @@ End
 
 
 Function MarkFlaggedPixels()
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
-	
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
+	if (!IsDataLoaded())
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -452,9 +445,7 @@ End
 
 
 Function ClassifyCurves()
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
-	
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
+	if (!IsDataLoaded())
 		print "Error: no FV map loaded yet"
 		return -1
 	endif
@@ -763,9 +754,8 @@ End
 
 
 Function MarkClassifiedPixels()
-	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	if (!IsDataLoaded())
 	
-	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
 		print "Error: no FV map loaded yet"
 		return -1
 	endif

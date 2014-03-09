@@ -72,6 +72,17 @@ End
 
 
 
+Function IsDataLoaded()
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
+		return 0
+	else
+		return 1
+	endif
+End
+
+
 // Kills all waves in the current data folder starting with fc* and rfc*
 //
 // Returns 0 on success
