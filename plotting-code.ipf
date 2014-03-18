@@ -125,7 +125,7 @@ Function inspector(s)			//heightsmap
 		return rval
 	endif
 	
-	NVAR rowsize = :internalvars:FVRowSize
+	NVAR/Z rowsize = :internalvars:FVRowSize
 	
 	Variable mouseX = s.mouseLoc.h
 	Variable mouseY = s.mouseLoc.v
