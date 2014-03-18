@@ -78,3 +78,11 @@ Proc escapefraction_histo() : GraphStyle
 	SetAxis/Z bottom 0,300
 EndMacro
 
+
+Proc dahlinmaps() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z margin(right)=150,width=300,height=300
+	ModifyGraph/Z mirror=2
+	ModifyGraph/Z nticks=0
+	ModifyGraph/Z standoff=0
+EndMacro
