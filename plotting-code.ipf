@@ -326,7 +326,9 @@ Function PlotFC_plotdata(index)
 		return -1
 	endif
 	
-	// Somewhat of a "hack" to switch on/off parts of elements on graph
+	// SET MODE
+	// This is a "hack" to switch on/off parts of elements on graph
+	// mode 0: normal; 1: reduced; 2: customized
 	Variable mode = 0
 	
 	GetWindow kwTopWin, userdata
@@ -398,6 +400,12 @@ Function PlotFC_plotdata(index)
 	ModifyGraph zero=8
 	
 	PlotFC_setzoom(zoomlvl)	
+		
+	if (mode == 2)
+		ModifyGraph log(left)=1
+		SetAxis left 2,*
+		SetAxis bottom -2,50
+	endif
 	
 	WAVE brushheights
 	WAVE/Z deflsensfit
