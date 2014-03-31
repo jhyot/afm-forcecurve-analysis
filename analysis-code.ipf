@@ -1294,6 +1294,8 @@ Function RetractTSD3(index)
 	rfc[][index] = w[p]
 	rfc_x_tsd[][index] = xTSD[p]
 	
+	fcmeta[index] = header
+	
 	return 0	
 End
 
@@ -1404,6 +1406,7 @@ Function RecalcDeflSens(dsens, idx)
 	NVAR zsensloaded = :internalvars:isZsensLoaded
 	
 	ConvertForceToV(w, fcmeta[idx])
+	ConvertForceToV(rw, fcmeta[idx])
 	
 	// V -> nm
 	w *= dsens
@@ -1433,8 +1436,10 @@ Function RecalcDeflSens(dsens, idx)
 	Variable zeroRange = round(fcpoints / rampsize * ksDeflSens_ContactLen/2)
 	WaveStats/M=1/R=[3,zeroRange]/Q wtsd
 	wtsd -= V_avg
-	WaveStats/Q/M=1 rwtsd
-	rwtsd -= V_min
+	
+	zeroRange = round(fcpoints / rampsizeretr * ksDeflSens_ContactLen/2)
+	WaveStats/M=1/R=[3,zeroRange]/Q rwtsd
+	rwtsd -= V_avg
 	
 	// write back to 2D waves
 	fc[][idx] = w[p]
