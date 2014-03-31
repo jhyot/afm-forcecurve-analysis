@@ -79,10 +79,96 @@ Proc escapefraction_histo() : GraphStyle
 EndMacro
 
 
-Proc dahlinmaps() : GraphStyle
+Proc fvmaps_plain() : GraphStyle
 	PauseUpdate; Silent 1		// modifying window...
 	ModifyGraph/Z margin(right)=150,width=300,height=300
 	ModifyGraph/Z mirror=2
 	ModifyGraph/Z nticks=0
 	ModifyGraph/Z standoff=0
 EndMacro
+
+
+Proc loadingrate_means_export() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z mode=4
+	ModifyGraph/Z marker[0]=16,marker[1]=19
+	ModifyGraph/Z lSize=2
+	ModifyGraph/Z rgb[1]=(0,0,65280)
+	ModifyGraph/Z msize=3
+	ModifyGraph/Z mirror(left)=3,mirror(bottom)=2
+	ModifyGraph/Z nticks(left)=6
+	ModifyGraph/Z minor(left)=1
+	ModifyGraph/Z sep=10
+	ModifyGraph/Z fSize=14
+	ModifyGraph/Z lblMargin(left)=4,lblMargin(bottom)=3
+	ModifyGraph/Z standoff=0
+	ModifyGraph/Z standoff(left)=1
+	SetAxis/Z bottom 0,30
+	ModifyGraph tick=2
+	ModifyGraph minor=1,sep(bottom)=20,manTick(left)={0,4,0,0},manMinor(left)={1,50};DelayUpdate
+	ModifyGraph manTick(bottom)={0,5,0,0},manMinor(bottom)={1,50}
+EndMacro
+
+
+Proc loadingrate_histograms_export() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z mode[5]=3,mode[6]=3,mode[7]=3,mode[8]=3,mode[9]=3
+	ModifyGraph/Z marker[5]=16,marker[6]=19,marker[7]=17,marker[8]=23,marker[9]=18
+	ModifyGraph/Z lSize[0]=2,lSize[1]=2,lSize[2]=2,lSize[3]=2,lSize[4]=2
+	ModifyGraph/Z rgb[0]=(65280,32768,58880),rgb[1]=(32768,40704,65280),rgb[2]=(65280,32512,16384)
+	ModifyGraph/Z rgb[3]=(0,52224,26368),rgb[4]=(52224,52224,0),rgb[5]=(65280,32768,58880)
+	ModifyGraph/Z rgb[6]=(32768,40704,65280),rgb[7]=(65280,32512,16384),rgb[8]=(0,52224,26368)
+	ModifyGraph/Z rgb[9]=(52224,52224,0)
+	ModifyGraph/Z msize[5]=2,msize[6]=2,msize[7]=2,msize[8]=2,msize[9]=2
+	ModifyGraph/Z hbFill[0]=2,hbFill[1]=2,hbFill[2]=2,hbFill[3]=2,hbFill[4]=2
+	ModifyGraph/Z useBarStrokeRGB[0]=1,useBarStrokeRGB[1]=1,useBarStrokeRGB[2]=1,useBarStrokeRGB[3]=1
+	ModifyGraph/Z useBarStrokeRGB[4]=1
+	ModifyGraph/Z mirror=2
+	ModifyGraph/Z nticks(left)=3
+	ModifyGraph/Z minor(bottom)=1
+	ModifyGraph/Z sep(bottom)=10
+	ModifyGraph/Z fSize=14
+	ModifyGraph/Z lowTrip(left)=0.01
+	ModifyGraph/Z standoff=0
+	Label/Z left "frequency"
+EndMacro
+
+
+Proc brushhisto_export() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z mode[0]=5
+	ModifyGraph/Z lSize[1]=2,lSize[2]=2
+	ModifyGraph/Z rgb[1]=(0,0,0),rgb[2]=(0,0,0)
+	ModifyGraph/Z hbFill[0]=2
+	ModifyGraph/Z useBarStrokeRGB[0]=1
+	ModifyGraph/Z mirror=2
+	ModifyGraph/Z nticks(left)=3
+	ModifyGraph/Z minor(bottom)=1
+	ModifyGraph/Z fSize=14
+	ModifyGraph/Z lowTrip(left)=1e-05
+	ModifyGraph/Z standoff=0
+	Label/Z left "normalized frequency"
+	Label/Z bottom "brush height (nm)"
+	SetAxis/Z left 0,0.09
+	SetAxis/Z bottom -2,45
+EndMacro
+
+Proc fcurve_export() : GraphStyle
+	PauseUpdate; Silent 1		// modifying window...
+	ModifyGraph/Z mode=3
+	ModifyGraph/Z marker=19
+	ModifyGraph/Z rgb[0]=(65280,43520,0),rgb[1]=(0,15872,65280)
+	ModifyGraph/Z msize=1
+	ModifyGraph/Z zero=1
+	ModifyGraph/Z mirror=2
+	ModifyGraph/Z minor=1
+	ModifyGraph/Z fSize=14
+	ModifyGraph/Z standoff=0
+	Label/Z left "force (pN)"
+	Label/Z bottom "tip-sample distance (nm)"
+	SetAxis/Z left -30,700
+	SetAxis/Z bottom -2,40
+EndMacro
+
+
+
