@@ -1089,6 +1089,9 @@ Function/S MakeGraphName(suffix)
 	String name = TidyDFName(GetGraphDF())
 	name = ReplaceString(":", name, "_")
 	
+	if (strlen(name) == 0)
+		name = "root"
+	endif
 	name = name + "_" + suffix
 
 	DoWindow $name
