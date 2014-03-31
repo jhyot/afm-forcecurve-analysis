@@ -193,6 +193,12 @@ Function brushheight_alex_derj(w,d) : FitFunc
 	//CurveFitDialog/ w[2] = L
 	//CurveFitDialog/ w[3] = s
 
+	Variable ret
+	
+	if (d < 0)
+		d = 1e-3
+	endif
+	
 	return 8*Pi/35 * w[0]*1e-9 * 1.38e-23 * w[1] * w[2]*1e-9 / (w[3]*1e-9)^3 * ( -12 + 7*(w[2]/d)^(5/4) + 5*(d/w[2])^(7/4) ) * 1e12
 End
 
@@ -256,6 +262,10 @@ Function brushheights_milner_derj(w,d) : FitFunc
 	//CurveFitDialog/ w[3] = b
 	//CurveFitDialog/ w[4] = s
 	//CurveFitDialog/ w[5] = L
+
+	if (d < 0)
+		d = 1e-3
+	endif
 
 	return Pi * w[0]*1e-9 * 1.38e-23 * w[1] * w[2] * ( Pi^2 * (w[3]*1e-9)^4 / 12 )^(1/3) / (w[4]*1e-9)^(10/3) * ( w[5]/d + (d/w[5])^2 - 1/5*(d/w[5])^5 - 9/5 ) * 1e12
 End
