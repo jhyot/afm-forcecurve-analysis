@@ -85,6 +85,7 @@ Proc fvmaps_plain() : GraphStyle
 	ModifyGraph/Z mirror=2
 	ModifyGraph/Z nticks=0
 	ModifyGraph/Z standoff=0
+	ColorScale/C/N=scale side=2,frame=1.50,fsize=14,tickLen=5.00,tickThick=2.00
 EndMacro
 
 
@@ -157,7 +158,7 @@ Proc fcurve_export() : GraphStyle
 	PauseUpdate; Silent 1		// modifying window...
 	ModifyGraph/Z mode=3
 	ModifyGraph/Z marker=19
-	ModifyGraph/Z rgb[0]=(65280,43520,0),rgb[1]=(0,15872,65280)
+	ModifyGraph/Z rgb[0]=(0,0,0),rgb[1]=(0,15872,65280)
 	ModifyGraph/Z msize=1
 	ModifyGraph/Z zero=1
 	ModifyGraph/Z mirror=2
@@ -166,8 +167,8 @@ Proc fcurve_export() : GraphStyle
 	ModifyGraph/Z standoff=0
 	Label/Z left "force (pN)"
 	Label/Z bottom "tip-sample distance (nm)"
-	SetAxis/Z left -30,700
-	SetAxis/Z bottom -2,40
+	SetAxis/Z left -40,500
+	SetAxis/Z bottom -2,60
 EndMacro
 
 
