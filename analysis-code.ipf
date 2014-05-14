@@ -1862,6 +1862,112 @@ Function CurvesAreLoaded()
 End
 
 
+Function MedianFilterMap()	
+	String mapname = "image0"
+	Prompt mapname, "Image wave name (not graph name!)"
+	DoPrompt "", mapname
+	WAVE/Z map = $mapname
+	if (!WaveExists(map))
+		print "Abort: No such image wave: " + mapname
+		return -1
+	endif
+	
+	SaveBackupWave(mapname, "medianfilt")
+	matrixfilter/N=3/P=1 median map
+	matrixfilter/N=3 nanzapmedian map
+End
+
+Function SubtractBaseline()
+	
+	if (cmpstr(CsrInfo(A), "") == 0)
+		String dataname = "fc_z"
+		Prompt dataname, "Data wave name"
+		DoPrompt "", dataname
+		WAVE/Z data = $dataname
+		if (!WaveExists(data))
+			print "Abort: No wave: " + dataname
+			return -1
+		endif
+	else
+		WAVE data = CsrWaveRef(A)
+	endif
+	
+	SaveBackupWave(NameOfWave(data), "baselinesubtr")
+	
+	Make/FREE/N=(numpnts(data)) mask = 1
+	
+	
+	// Check all cursors (A to J, ASCII 65-74)
+	// And exclude data between pairs of cursors
+	String cname1 = "", cname2 = ""
+	Variable pairs = 0
+	
+	Variable i = 0
+	for (i=65; i<=73; i+=2)
+		cname1 = num2char(i)
+		cname2 = num2char(i+1)
+		if (cmpstr(CsrInfo($cname1), "") != 0 && cmpstr(CsrInfo($cname2), "") != 0)
+			if (WaveRefsEqual(CsrWaveRef($cname1), data) && WaveRefsEqual(CsrWaveRef($cname2), data))
+				// Cursor pair exists and is on data wave
+				mask[pcsr($cname1), pcsr($cname2)] = 0
+				pairs += 1
+			endif
+		else
+			break
+		endif
+	endfor
+	
+	print "Baseline fitting, excluding " + num2str(pairs) + " regions."
+	CurveFit/Q line, data /M=mask
+	WAVE W_coef
+	data -= W_coef[0] + W_coef[1]*x
+	
+	return 0
+End
+
+// Create histogram of brush heights
+Function BrushHisto(binsize)
+	Variable binsize  // nm
+	Variable binmin = -5		// nm
+
+	NVAR/Z isDataLoaded = :internalvars:isDataLoaded
+	if (!NVAR_Exists(isDataLoaded) || isDataLoaded != 1)
+		print "Error: no FV map loaded yet"
+		return -1
+	endif
+	
+	WAVE brushheights
+	Variable binmax = GetUpperPercentile(brushheights, 99)
+	// Round to upper decade
+	binmax = 10*ceil(binmax/10)
+	
+	Variable bins = ceil((binmax - binmin)/binsize)
+	Make/O/N=(bins) brushheights_histo = 0
+	WAVE brushheights_histo
+	Histogram/P/B={binmin, binsize, bins} brushheights, brushheights_histo
+	
+	Display brushheights_histo
+	String name = MakeGraphName("bhisto")
+	DoWindow/C $name
+	ModifyGraph mode=5, hbFill=2, useBarStrokeRGB=1
+	PutDFNameOnGraph()
+End
+
+
+Function ExtractHardwallForce()
+	NVAR numfc = :internalvars:numCurves
+	Variable i
+	WAVE/T fcmeta
+	WAVE fc
+	Make/N=(numfc)/O hardwallforce = NaN
+	Variable hardwallpt
+	for (i=0; i < numfc; i +=1)
+		hardwallpt = NumberByKey("hardwallpt", fcmeta[i])
+		if (numtype(hardwallpt) == 0)
+			hardwallforce[i] = fc[hardwallpt][i]
+		endif
+	endfor
+End
 
 
 

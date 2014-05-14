@@ -3,16 +3,10 @@
 SetIgorOption colorize,UserFuncsColorized=1
 
 
-#include ":fc-script-config"
-#include ":analysis-code"
-#include ":plotting-code"
-#include ":loader"
-#include ":parser"
-#include ":review-classify"
-#include ":helper"
-#include ":xsectanalysis-helper"
-#include ":styles"
-#include ":fitting"
+#include ":includes"
+
+
+// SEE fc-script.config.ipf FOR USER CUSTOMIZABLE PARAMETERS
 
 
 
@@ -20,13 +14,9 @@ SetIgorOption colorize,UserFuncsColorized=1
 // TODO
 // Make multiple 2d arrays possible in same datafolder (keep track of wave names etc instead of hardcoding)
 // Make button in heightimage and heightmap for inspect mode (i.e. be able to turn off inspect mode)
-// indicate flagged curves in review
-// Running analysis more than once changes the data (because LSB->V->nm->N transformation happens inline in fc wave)
-//
+// indicate flagged curves in review//
 // Print analysis algorithm name and parameters when starting analysis
 // rename analysis parameter constants to be absolutely clear from their names
-// Single FCs: do appropriate checks in user accessible functions (like in all the other ones)
-// Read image scale ("scan size") when loading a map. Check whether works well with all the pixel selecting code etc
 
 
 
@@ -53,19 +43,20 @@ Menu "Force Map Analysis"
 	"Show Height Results", MapToForeground()
 	"-"
 	Submenu "Review"
-		"Flag curves...", FlagCurves()
-		"Mark flagged", MarkFlaggedPixels()
+		"Flag Curves...", FlagCurves()
+		"Mark Flagged", MarkFlaggedPixels()
 		"-"
 		"Review Flagged Curves", ReviewCurvesFlagged()
 		"Review All Curves", ReviewCurvesAll()
 		"-"
 		"Classify Curves", ClassifyCurves()
-		"Mark classified", MarkClassifiedPixels()
-		"Mark classified and excluded", MarkClassifiedAndExcludedPixels()
+		"Mark Classified", MarkClassifiedPixels()
+		"Mark Classified and Excluded", MarkClassifiedAndExcludedPixels()
 	End
 	Submenu "Helper"
 		"Brush Histogram", BrushHisto(1)
 		"Subtract Baseline", SubtractBaseline()
+		"Median Filter Image", MedianFilterMap()
 	End
 	"-"
 	"Settings...", SetSettings(0)
@@ -182,12 +173,12 @@ Function CheckRoot()
 	String df = GetDataFolder(0)
 	if (cmpstr(df, "root") == 0)
 		DoAlert 1, "You are in root data folder, this is not recommended.\rContinue anyway?"
-		if (V_flag == 2)
-			return -1
+		if (V_flag == 1)
+			return 0
 		endif
 	endif
 	
-	return 0
+	return -1
 End
 
 

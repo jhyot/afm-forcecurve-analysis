@@ -1394,7 +1394,7 @@ Function CreateLegendFromFolders(cols)
 	TextBox/C/N=legend0 s
 End
 
-
+// Function doesn't do anything useful yet.
 Function AddLogLin(state)
 	Variable state	// 1: toolbar on	; 0: toolbar off
 	if (state == 1)

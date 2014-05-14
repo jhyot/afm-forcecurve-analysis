@@ -2,20 +2,7 @@
 
 #include <Waves Average>
 
-Function findmax()
-	Variable i = 0
-	WAVE fc
-	Variable pt = 4096
-	for (i=0; i < 1024; i+=1)
-		Duplicate/FREE/O/R=[][i] fc, w
-		FindLevel/P/Q w, (w[0] + 1000)
-		if (!V_flag)
-			pt = min(pt, V_LevelX)
-		endif
-	endfor
-	
-	print "max pt: " + num2str(pt)
-End
+
 
 
 Function LoopDFRFunc(f, dfpath, filter, [par1, par2])
@@ -116,37 +103,6 @@ Function ChangeColorAccordingToFolder(index)
 	Variable r, g, b
 	sscanf StringByKey(GetDataFolder(0), list), "%d,%d,%d", r, g, b
 	ModifyGraph rgb[index]=(r,g,b)
-End
-
-
-Function FitDeflSensAndMakeTSD(w, meta)
-	WAVE w
-	String meta
-	
-	NVAR/Z deflfit = $(NameOfWave(w) + "_deflfit")
-	if (NVAR_Exists(deflfit))
-		meta = ReplaceNumberByKey("deflSensUsed", meta, deflfit)
-	else
-		Variable/G $(NameOfWave(w) + "_deflfit")
-		NVAR deflfit = $(NameOfWave(w) + "_deflfit")
-	endif
-	
-	STRUCT FitDeflReturn ret
-	ConvertForceToV(w, meta)
-	FitDeflectionSensitivity(w, meta, $"", ret)
-	deflfit = ret.deflsensfit
-	
-	w *= deflfit
-	
-	print "deflSensFit:", deflfit
-	
-	STRUCT CreateTSDReturn rettsd
-	CreateTSDWave(w, $"", rettsd)
-	
-	Duplicate/O rettsd.tsd, $(NameOfWave(w) + "_xtsd")
-	
-	w *= 1000 * NumberByKey("springConst", meta)
-	SetScale d 0,0,"pN", w
 End
 
 
@@ -266,20 +222,20 @@ Function RatesCalcAndDisplay(df)
 		
 		// run desired custom code here
 		
-		MakeHisto("relstiffness_hole", "relstiffness_hist", .2)
-		//MakeHisto("emod2_full", "emod2_hist", .15e6)
+		MakeHisto("brushheights_full", "brushheights_hist", 1.5, binmin=-10)
+		MakeHisto("relstiffness_full", "relstiffness_hist", 0.15)
 
 		if (cmpstr(subdfitem, "r29") == 0)
 			Display
-			graph1name = MakeGraphName("rlh")
+			graph1name = MakeGraphName("brhist")
 			DoWindow/C $graph1name
-//			Display
-//			graph2name = MakeGraphName("e2hi")
-//			DoWindow/C $graph2name
+			Display
+			graph2name = MakeGraphName("rehist")
+			DoWindow/C $graph2name
 		endif
 
-		AppendToGraph/W=$graph1name $"relstiffness_hist"
-		//AppendToGraph/W=$graph2name $"emod2_hist"
+		AppendToGraph/W=$graph1name $"brushheights_hist"
+		AppendToGraph/W=$graph2name $"relstiffness_hist"
 
 		// end custom code
 		
@@ -293,17 +249,17 @@ Function RatesCalcAndDisplay(df)
 	TextBox/C/N=legend0/A=RT/X=-5/Y=-5
 	PutDFNameOnGraph()
 	SetAxis/A left
-	SetAxis bottom 4,8
-	Label bottom "E-modulus region 1 (Pa)"
+	SetAxis/A bottom
+	Label bottom "Brush height (nm)"
 	
-//	DoWindow/F $graph2name
-//	Execute/Q/Z "histocolors()"
-//	CreateLegendFromFolders(1)
-//	TextBox/C/N=legend0/A=LT/X=0/Y=0
-//	PutDFNameOnGraph()
-//	SetAxis/A left
-//	SetAxis bottom 0, 3e6
-//	Label bottom "E-modulus region 2 (Pa)"
+	DoWindow/F $graph2name
+	Execute/Q/Z "histocolors()"
+	CreateLegendFromFolders(1)
+	TextBox/C/N=legend0/A=RT/X=0/Y=0
+	PutDFNameOnGraph()
+	SetAxis/A left
+	SetAxis/A bottom
+	Label bottom "rel. linear stiffness (pN/nm)"
 	
 //	DoWindow/F $graph1name
 //	Execute/Q/Z "scattercolors()"
@@ -332,53 +288,6 @@ Function RatesCalcAndDisplay(df)
 	SetDataFolder origdf
 	
 	return 0
-End
-
-
-Function rengraph()
-	WAVE w = fc_z
-	String suffix = "xsect"
-	String g = StringFromList(0, FindGraphsWithWave(w))
-	String name = MakeGraphName(suffix)
-	DoWindow/C/W=$g $name
-End
-
-Function killwin()
-	WAVE w = brushheights_histo
-	String g = StringFromList(0, FindGraphsWithWave(w))
-	KillWindow $g
-End
-
-
-// Function by Jon Tischler
-// TischlerJZ at ornl.gov
-// http://www.wavemetrics.com/search/viewmlid.php?mid=23626
-Function/S FindGraphsWithWave(w) // find the graph windows which contain the specified wave, returns a list of graph names
-	Wave w
-	if (!WaveExists(w))
-		return ""
-	endif
-	String name0=GetWavesDataFolder(w,2), out=""
-	String win,wlist = WinList("*",";","WIN:1"), clist, cwin
-	Variable i,m,Nm=ItemsInList(wlist)
-	for (m=0;m<Nm;m+=1)
-		win = StringFromList(m,wlist)
-		CheckDisplayed/W=$win w
-		if (V_flag>0)
-			out += win+";"
-		else
-			clist = ChildWindowList(win)
-			for (i=0;i<ItemsInLIst(clist);i+=1)
-				cwin = StringFromList(i,clist)
-				CheckDisplayed/W=$(win+"#"+cwin) w
-				if (V_flag>0)
-					out += win+"#"+cwin+";"
-					break
-				endif
-			endfor
-		endif
-	endfor
-	return out
 End
 
 
@@ -600,24 +509,6 @@ Function MarkRelStiffness(lo, hi)
 End
 
 
-Function ConvTempRawToV(i)
-	Variable i
-	
-	NVAR fcpoints = :internalvars:FCNumPoints
-	
-	Make/N=(fcpoints)/O wtemp
-	
-	WAVE fc
-	WAVE/T fcmeta
-	
-	wtemp[] = fc[p][i]
-	String h = fcmeta[i]
-	
-	ConvertRawToV(wtemp, h)
-
-End
-
-
 Function DeflRef_DrawLines(numspots, numramps)
 	Variable numspots	// num of different spots
 	Variable numramps	// num of ramps in multiramp series
@@ -832,22 +723,6 @@ Function/S FindSubDataFolder(matchstr)
 End
 
 
-Function BinSizeFreedmanDiaconis(wname)
-	String wname
-	
-	WaveStats/Q $wname
-	StatsQuantiles/Q $wname
-	
-	return 2 * V_IQR / (V_npnts^(1/3))
-End
-
-Function BinSizeSuggestion(wname)
-	String wname
-	
-	return BinSizeFreedmanDiaconis(wname)
-End
-
-
 // Run in same data folder as indicated waves
 // At the moment processes 2 ranges; (hardcoded below)
 Function MarkCurvesAroundAvg(wlist, markwlist, avglist, tolerancelist)
@@ -1016,20 +891,5 @@ Function AverageMarkedCurves(wname, avgname, marker, [from, to])
 	avgw *= springConst * 1000	
 End
 
-
-Function ExtractHardwallForce()
-	NVAR numfc = :internalvars:numCurves
-	Variable i
-	WAVE/T fcmeta
-	WAVE fc
-	Make/N=(numfc)/O hardwallforce = NaN
-	Variable hardwallpt
-	for (i=0; i < numfc; i +=1)
-		hardwallpt = NumberByKey("hardwallpt", fcmeta[i])
-		if (numtype(hardwallpt) == 0)
-			hardwallforce[i] = fc[hardwallpt][i]
-		endif
-	endfor
-End
 
 
