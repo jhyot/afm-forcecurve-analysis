@@ -173,12 +173,12 @@ Function CheckRoot()
 	String df = GetDataFolder(0)
 	if (cmpstr(df, "root") == 0)
 		DoAlert 1, "You are in root data folder, this is not recommended.\rContinue anyway?"
-		if (V_flag == 1)
-			return 0
+		if (V_flag != 1)
+			return -1
 		endif
 	endif
 	
-	return -1
+	return 0
 End
 
 
