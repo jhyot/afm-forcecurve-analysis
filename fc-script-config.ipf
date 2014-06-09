@@ -37,13 +37,11 @@ Constant ksBrushOverNoise = 2			// height from point on curve above noise multip
 
 // Deflection sensitivity calculation parameters
 Constant ksDeflSens_ContactLen = 25				// ca. contact length (piezo ramp length, in nm)
-//Constant ksDeflSens_SmoothCurveLen = 25		// Smoothing range for initial curve smoothing (in nm)  [old param, not used anymore]
-//Constant ksDeflSens_SmoothDerivLen = 12  	// Smoothing range for derivative smoothing (in nm)  [old param, not used anymore]
 Constant ksDeflSens_EdgeFraction = 0.02	// Defines end of hardwall part, the closer to 0, the less of curve
 													// gets fitted (useful values 0.01 - 0.1)
 
 // Further Analysis flags
-Constant ksFixDefl = 1 				// Deflection sensitivity; 0: Fit for each curve; 1: Use fixed from header
+Constant ksFixDefl = 0 				// Deflection sensitivity; 0: Fit for each curve; 1: Use fixed from header
 Constant ksXDataZSens = 1				// 0: don't use Zsensor data as X axis; 1: use Zsensor data where available;
 											// 2: force use of Zsensor data; i.e. abort when not available
 Constant ksMaxGoodPt = -1			// (-1: ignore) Manually force the "last good point" to be below this value
