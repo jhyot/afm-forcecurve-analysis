@@ -419,6 +419,7 @@ Function ReviewCurves_Button(ctrlName)
 			if (zoom > 3)
 				zoom = 3
 			endif
+			DoWindow/F tmp_reviewgraph
 			PlotFC_setzoom(zoom)
 			break
 		case "unzoomb":
@@ -426,6 +427,7 @@ Function ReviewCurves_Button(ctrlName)
 			if (zoom < 0)
 				zoom = 0
 			endif
+			DoWindow/F tmp_reviewgraph
 			PlotFC_setzoom(zoom)
 			break
 		case "stopb":
