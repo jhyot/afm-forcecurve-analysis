@@ -6,7 +6,7 @@ SetIgorOption colorize,UserFuncsColorized=1
 #include ":includes"
 
 
-// SEE fc-script.config.ipf FOR USER CUSTOMIZABLE PARAMETERS
+// SEE fc-script-config.ipf FOR USER CUSTOMIZABLE PARAMETERS
 
 
 
