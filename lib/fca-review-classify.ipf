@@ -801,12 +801,14 @@ Function MarkPixels(filterw, del, color)
 	
 	Variable numcurves = numpnts(filterw)
 	NVAR rowsize = :internalvars:FVRowSize
-	SVAR imagegraph = :internalvars:imagegraph
+	SVAR/Z imagegraph = :internalvars:imagegraph
 	SVAR resultgraph = :internalvars:resultgraph
 	
 	if (del == 1)
 		// delete previous markers
-		DrawPointMarker(imagegraph, NaN, NaN, 1)
+		if (SVAR_Exists(imagegraph))
+			DrawPointMarker(imagegraph, NaN, NaN, 1)
+		endif
 		DrawPointMarker(resultgraph, NaN, NaN, 1)
 	endif
 
@@ -815,7 +817,9 @@ Function MarkPixels(filterw, del, color)
 		if (filterw[i] == 1)
 			Variable pixelX = mod(i,rowsize)
 			Variable pixelY = floor(i/rowsize)
-			DrawPointMarkerColor(imagegraph, pixelX, pixelY, 0, color)
+			if (SVAR_Exists(imagegraph))
+				DrawPointMarkerColor(imagegraph, pixelX, pixelY, 0, color)
+			endif
 			DrawPointMarkerColor(resultgraph, pixelX, pixelY, 0, color)
 		endif
 	endfor

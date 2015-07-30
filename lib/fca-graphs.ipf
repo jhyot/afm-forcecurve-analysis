@@ -124,7 +124,13 @@ Function ImageToForeground()
 		return -1
 	endif
 	
-	SVAR imagegraph = :internalvars:imagegraph
+	SVAR/Z imagegraph = :internalvars:imagegraph
+	
+	if (!SVAR_Exists(imagegraph))
+		print "Error: No image to show"
+		return -1
+	endif
+	
 	DoWindow/F $imagegraph
 End
 
