@@ -2,6 +2,8 @@
 
 
 #include "::config:fca-config"
+#include "::config:fca-zoom-config"
+
 #include ":fca-analysis"
 #include ":fca-graphs"
 #include ":fca-loader"
