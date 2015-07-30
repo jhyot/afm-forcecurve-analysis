@@ -38,11 +38,11 @@ Function/WAVE GetZoom(xtype, level)
 	zoom[1][1][0] = NaN; zoom[1][1][2] = -5
 	zoom[1][1][1] = NaN; zoom[1][1][3] = 80
 	// TSD, lvl2
-	zoom[1][2][0] = -5000; zoom[1][2][2] = -5
+	zoom[1][2][0] = -35; zoom[1][2][2] = -5
 	zoom[1][2][1] = 250; zoom[1][2][3] = 60
 	// TSD, lvl3
 	zoom[1][3][0] = -35; zoom[1][3][2] = -5
-	zoom[1][3][1] = 150; zoom[1][3][3] = 75
+	zoom[1][3][1] = 150; zoom[1][3][3] = 60
 	// Xsection plot zoom
 	zoom[1][4][0] = -200; zoom[1][4][2] = -5
 	zoom[1][4][1] = 250; zoom[1][4][3] = 120
