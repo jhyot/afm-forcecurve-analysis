@@ -3,10 +3,10 @@
 SetIgorOption colorize,UserFuncsColorized=1
 
 
-#include ":includes"
+#include ":lib:fca-includes"
 
 
-// SEE fc-script-config.ipf FOR USER CUSTOMIZABLE PARAMETERS
+// SEE config/fca-config.ipf FOR USER CUSTOMIZABLE PARAMETERS
 
 
 
