@@ -74,6 +74,23 @@ Function IsDataLoaded()
 	endif
 End
 
+// returns 1 if an topography image has been loaded
+Function IsImageLoaded()
+	SVAR/Z imagegraph = :internalvars:imagegraph
+	
+	if (!SVAR_Exists(imagegraph))
+		return 0
+	endif
+	
+	DoWindow $imagegraph
+	
+	if (V_flag == 0)
+		return 0
+	else
+		return 1
+	endif
+End
+
 
 // Kills all waves in the current data folder starting with fc* and rfc*
 //
