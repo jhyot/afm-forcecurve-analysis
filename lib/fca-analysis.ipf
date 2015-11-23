@@ -1872,14 +1872,18 @@ Function MedianFilterMap()
 		return -1
 	endif
 	
-	SaveBackupWave(mapname, "medianfilt")
+	String backupwave = SaveBackupWave(mapname, "medianfilt")
+	print "Filtering " + mapname
+	print "Original map saved in " + backupwave
 	matrixfilter/N=3/P=1 median map
 	matrixfilter/N=3 nanzapmedian map
 End
 
 Function SubtractBaseline()
 	
-	if (cmpstr(CsrInfo(A), "") == 0)
+	// check whether there is a graph window present
+	GetWindow/Z kwTopWin, active	
+	if (V_flag != 0 || cmpstr(CsrInfo(A), "") == 0)
 		String dataname = "fc_z"
 		Prompt dataname, "Data wave name"
 		DoPrompt "", dataname
@@ -1892,7 +1896,7 @@ Function SubtractBaseline()
 		WAVE data = CsrWaveRef(A)
 	endif
 	
-	SaveBackupWave(NameOfWave(data), "baselinesubtr")
+	String backupwave = SaveBackupWave(NameOfWave(data), "baselinesubtr")
 	
 	Make/FREE/N=(numpnts(data)) mask = 1
 	
@@ -1918,6 +1922,7 @@ Function SubtractBaseline()
 	endfor
 	
 	print "Baseline fitting, excluding " + num2str(pairs) + " regions."
+	print "Original saved in " + backupwave
 	CurveFit/Q line, data /M=mask
 	WAVE W_coef
 	data -= W_coef[0] + W_coef[1]*x

@@ -1,6 +1,7 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
-Function SaveBackupWave(orig, suffix)
+// Returns name of backup wave
+Function/S SaveBackupWave(orig, suffix)
 	String orig		// original wave to be backed up (in current folder)
 	String suffix	// name for backed up wave with <orig>_<suffix> (automatically in backups subfolder)
 	
@@ -9,6 +10,8 @@ Function SaveBackupWave(orig, suffix)
 	NewDataFolder/O backups
 	String backname = NameOfWave(w) + "_" + suffix
 	Duplicate/O w, :backups:$backname
+	
+	return "backups:" + backname
 End
 
 
