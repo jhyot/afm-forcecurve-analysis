@@ -56,7 +56,7 @@ Menu "Force Map Analysis"
 	Submenu "Helper"
 		"Brush Histogram", BrushHisto(1)
 		"Subtract Baseline", SubtractBaseline()
-		"Median Filter Image", MedianFilterMap()
+		"Median Filter Image...", MedianFilterMap()
 	End
 	"-"
 	"Settings...", SetSettings(0)
