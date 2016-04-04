@@ -10,7 +10,7 @@
 
 // The zoom levels are defined separately for a "tip-sample-distance"
 // and a "Z piezo position" graph type. The zoom levels are designated
-// 0 through 3, with usually 3 being the highest zoom.
+// 0 through 3, with usually 3 being the most zoomed in level.
 
 
 // Function returns wave with 4 rows in this order:
@@ -26,14 +26,16 @@ Function/WAVE GetZoom(xtype, level)
 	// ZOOM VALUES BLOCK
 
 	// Set zoom levels in a 3D wave:
-	// 1D: xtype;  2D: zoom level;  3D: y-min, y-max, x-min, x-max
-	// NaN = autoscale (check only "min" value)
+	// 1D: xtype (tip-sample-distance vs Z-position
+	// 2D: zoom level
+	// 3D: y-min, y-max, x-min, x-max
+	// NaN = autoscale (checks only "min" value, max is ignored)
 	
 	
 	//          left     ;    bottom
 	// TSD, lvl0
-	zoom[1][0][0] = NaN; zoom[1][0][2] = NaN
-	zoom[1][0][1] = NaN; zoom[1][0][3] = NaN
+	zoom[1][0][0] = NaN; zoom[1][0][2] = NaN    // min
+	zoom[1][0][1] = NaN; zoom[1][0][3] = NaN    // max
 	// TSD, lvl1
 	zoom[1][1][0] = NaN; zoom[1][1][2] = -5
 	zoom[1][1][1] = NaN; zoom[1][1][3] = 80
