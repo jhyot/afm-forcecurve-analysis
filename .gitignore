@@ -1,5 +1,7 @@
 .idea/
 
+*.zip
+
 # Avoid including Experiment files
 *.pxp
 *.pxt
