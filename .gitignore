@@ -7,3 +7,13 @@
 *.pxt
 *.uxp
 *.uxt
+
+# Latex related temporary files
+/doc/*.aux
+/doc/*.bbl
+/doc/*.bcf
+/doc/*.blg
+/doc/*.log
+/doc/*.out
+/doc/*.pdf
+/doc/*.run.xml
