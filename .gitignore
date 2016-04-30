@@ -1,0 +1,7 @@
+.idea/
+
+# Avoid including Experiment files
+*.pxp
+*.pxt
+*.uxp
+*.uxt
