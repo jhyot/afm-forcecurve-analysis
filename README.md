@@ -10,8 +10,7 @@ Wavemetrics.
   [igor]: https://www.wavemetrics.com/products/igorpro/igorpro.htm
 
 
-The software was developed for the analysis, review and classification of force curves and
-force volume maps.
+The software provides analysis, review and classification of force curves and force volume maps.
 
 
 
