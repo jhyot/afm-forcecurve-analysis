@@ -13,6 +13,15 @@ Wavemetrics.
 The software provides analysis, review and classification of force curves and force volume maps.
 
 
+Installation
+------------
+
+* Go to <https://github.com/jhyot/afm-forcecurve-analysis/releases/latest>
+* Download the `afm-forcecurve-analysis.zip` file.
+* Unpack the contents of the zip file into any directory on your computer.
+* Open `force-curve-analysis.ipf` in IGOR and compile the file. You are now ready to use the software.
+
+
 
 Acknowledgements
 ----------------
