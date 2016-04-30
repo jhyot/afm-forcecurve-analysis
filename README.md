@@ -13,6 +13,18 @@ Wavemetrics.
 The software provides analysis, review and classification of force curves and force volume maps.
 
 
+
+Requirements
+------------
+
+You need to have IGOR Pro in order to run the AFM analysis software.
+
+The software has been tested with IGOR Pro 6.3.4 under Windows 7.
+
+The software has been tested with data from Bruker Nanoscope versions 7.3 and 8.1x
+
+
+
 Installation
 ------------
 
@@ -34,6 +46,7 @@ Original contributors:
 
 
   [nanobio]: http://www.biozentrum.unibas.ch/research/groups-platforms/overview/unit/lim/
+
 
 
 License
