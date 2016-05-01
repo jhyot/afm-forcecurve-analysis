@@ -34,6 +34,16 @@ Installation
 * Open `force-curve-analysis.ipf` in IGOR and compile the file. You are now ready to use the software.
 
 
+Building from source
+--------------------
+
+There is no build process, the `.ipf` files can be directly openend with IGOR Pro. The folder structure must be
+kept the same so that the individual files can be found from the main `force-curve-analysis.ipf` file.
+
+Run `./build.sh` (on Linux only) from the project root folder to automatically generate a zip file with the necessary files for
+easy redistribution.
+
+
 
 Acknowledgements
 ----------------
