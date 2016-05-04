@@ -17,10 +17,11 @@ manualbasename="afm-forcecurve-analysis-manual"
 
 rm -rf "$buildfolder"
 mkdir -p "$buildfolder/$doctargetfolder"
-rootdir=$(pwd)
+rootdir="$(pwd)"
 
 cd "$docsourcefolder"
-pdflatex -output-directory "../$buildfolder/$doctargetfolder" "$manualbasename.tex" && pdflatex -output-directory "../$buildfolder/$doctargetfolder" "$manualbasename.tex"
+pdflatex -output-directory "../$buildfolder/$doctargetfolder" "$manualbasename.tex" \
+    && pdflatex -output-directory "../$buildfolder/$doctargetfolder" "$manualbasename.tex"
 
 cd "$rootdir"
 zip -r "$buildfolder/$zipfilename" config lib forcecurve-analysis.ipf LICENSE README.md
