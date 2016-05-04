@@ -1,22 +1,31 @@
 #!/usr/bin/env sh
 
-# Builds a zip archive including all the necessary files to run this software in Igor.
+# Build script for the afm-forcecurve-analysis software.
+# This build script runs on Linux.
 #
-# The desired zip file name can be passed as an argument, otherwise a default name will be used.
+# Build steps:
+# * Deletes the old build folder
+# * Generates the PDF manual from Latex source. A Tex distribution with pdflatex and necessary latex packages must be installed on the machine.
+# * Builds a zip archive with the programs files and the manual PDF
 
 
+buildfolder="build"
 zipfilename="afm-forcecurve-analysis.zip"
+docsourcefolder="doc"
+doctargetfolder="manual"
+manualbasename="afm-forcecurve-analysis-manual"
 
+rm -rf "$buildfolder"
+mkdir -p "$buildfolder/$doctargetfolder"
+rootdir=$(pwd)
 
-case "$1" in
-	-h | --help | -\?)
-		echo "Usage: `basename $0` [zipfilename]"
-		exit
-		;;
-	?*)
-		zipfilename="$1"
-		;;
-esac
+cd "$docsourcefolder"
+pdflatex -output-directory "../$buildfolder/$doctargetfolder" "$manualbasename.tex" && pdflatex -output-directory "../$buildfolder/$doctargetfolder" "$manualbasename.tex"
 
-zip -rFS "$zipfilename" config lib forcecurve-analysis.ipf LICENSE README.md
+cd "$rootdir"
+zip -r "$buildfolder/$zipfilename" config lib forcecurve-analysis.ipf LICENSE README.md
 
+cd "$buildfolder"
+zip "$zipfilename" "$doctargetfolder/$manualbasename.pdf"
+
+cd "$rootdir"
