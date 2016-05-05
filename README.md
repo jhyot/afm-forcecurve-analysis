@@ -68,9 +68,5 @@ License
 -------
 This software is licensed under the Apache License 2.0. See the LICENSE file for full details.
 
-
-------
-
-Copyright &copy; 2016 University of Basel
-
-
+Copyright (c) 2016 Janne Hyötylä
+Copyright (c) 2016 University of Basel
