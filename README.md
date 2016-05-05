@@ -37,16 +37,24 @@ Installation
 * Open `force-curve-analysis.ipf` in IGOR and compile the file. You are now ready to use the software.
 
 
+Manual
+------
+
+The manual for this software is included as a PDF file in the release zip file. The source of the manual resides in
+Latex format in the `doc` folder of the repository.
+
+
 Building from source
 --------------------
 
 There is no build process, the `.ipf` files can be directly openend with IGOR Pro. The folder structure must be
 kept the same so that the individual files can be found from the main `force-curve-analysis.ipf` file.
 
-Run `./build.sh` (currently on Linux only) from the project root folder to automatically generate a zip file with the
-necessary files for easy redistribution.
+Run `./build.sh` (currently on Linux only) from the project root folder to automatically generate a zip file in the `build`
+folder with the necessary files for easy redistribution.
 
 To also generate the PDF manual from Latex sources, a Tex distribution must be present on the build system.
+`build.sh` will generate the PDF and add it to the zip file if pdflatex is present on the system.
 
 
 

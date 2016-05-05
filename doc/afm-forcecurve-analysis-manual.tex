@@ -6,8 +6,6 @@
 \usepackage{graphicx}
 \graphicspath{ {figures/} }
 
-\usepackage[hidelinks]{hyperref}
-
 \usepackage{csquotes}
 \usepackage[UKenglish]{babel}
 
@@ -17,6 +15,9 @@
 \usepackage[os=win]{menukeys}
 
 \usepackage[margin=3cm]{geometry}
+
+\usepackage[hidelinks]{hyperref}
+
 
 
 \title{AFM Force Curve Analysis Software Package for Wavemetrics IGOR Pro}
@@ -234,7 +235,7 @@ Brush heights from accepted and rejected curves are stored in the \texttt{height
 If a review is stopped before reviewing all curves, the brush heights from the remaining curves will not be added to either of the new waves.
 
 \subsubsection{Classifying curves}
-The \menu{Review > Classify Curves} function is a specialized reviewing tool that was used to analyse the data for Chapter~\ref{sec:escape-transition-geometry}.
+The \menu{Review > Classify Curves} function is a specialized reviewing tool that was used to analyse the escape transition data in \cite[p.~73]{hyotyla2016}.
 In its current form it can only be used to classify force curves taken over a ring-like structure. A force curve can be classified as  \enquote*{exhibiting a certain feature}, or \enquote*{not exhibiting the feature} (or excluded from classification, e.g. when the data quality is too bad).
 After the classification step, a histogram is computed that shows the frequency of the classified feature as a function of the distance from the center of the ring (with and without normalizing for the number of curves at a given distance).
 Pixels which have low enough quasi-topography height (i.e.\ which lie outside the ring structure) are automatically excluded from classification.
@@ -272,16 +273,21 @@ It is recommended to call the additional analysis functions only after performin
 \begin{description}[style=nextline]
 
 \item[CalcLinStiffness]
-Calculates the linear brush stiffness for the currently loaded data, as used in section~\ref{sec:brush-stiffness-loading-rate} and described in the Methods in section~\ref{sec:afm-data-analysis}. The resulting data will be saved in the \texttt{linstiffness} wave.
+Calculates the linear brush stiffness for the currently loaded data. The resulting data will be saved in the \texttt{linstiffness} wave.
+An example of linear brush stiffness data analysis can be found in \cite[p.~68]{hyotyla2016}, and the exact algorithm for calculating the stiffness is
+described in \cite[p.~33]{hyotyla2016}.
 
 \item[CalcHertzEModAll]
-Calculates the brush Young's modulus for the currently loaded data. The algorithm is described in section~\ref{sec:brush-stiffness-loading-rate}. Uses the \texttt{twohertz} curve fitting function from \texttt{lib/fca-fitting.ipf}.
-Note that some coefficients for the fit are hardcoded in the \texttt{CalcHertzEMod} function. The calculated $E_1$ and $E_2$ Young's moduli are saved in the \texttt{emod1} and \texttt{emod2} waves.
+Calculates the brush Young's modulus for the currently loaded data. Note that some coefficients for the fit are hardcoded in the \texttt{CalcHertzEMod} function.
+The calculated $E_1$ and $E_2$ Young's moduli are saved in the \texttt{emod1} and \texttt{emod2} waves.
+An example of this analysis can be found in \cite[p.~68]{hyotyla2016}, and the algorithm is described in \cite[p.~33]{hyotyla2016}.
+Uses the \texttt{twohertz} curve fitting function from \texttt{lib/fca-fitting.ipf}.
+
 
 \end{description}
 
 
-Functions residing in the file \path{lib/fca-absolute-relative-heights.ipf} are used to produce the \enquote*{brush contact height} analysis and corresponding plots in section~\ref{sec:pegylated-nanoholes}.
+Functions residing in the file \path{lib/fca-absolute-relative-heights.ipf} are used to produce the \enquote*{brush contact height} analysis and corresponding plots as seen in \cite[p.~57]{hyotyla2016}.
 
 \begin{description}[style=nextline]
 
@@ -290,7 +296,7 @@ Creates the wave that holds the \enquote*{brush contact height} data (i.e. image
 Parameters \texttt{img} and \texttt{bheights} are existing image and brush height wave names, while the other parameters are names of waves that will be created by the function (absolute brush height wave and the two different \enquote*{zero} lines).
 
 \item[scatterplots]
-Creates the scatterplots used in section~\ref{sec:pegylated-nanoholes}. Parameters are as above, with \texttt{img}, \texttt{bheights} and \texttt{added} names of existing waves, while the other two will be created.
+Creates the scatterplots used \cite[p.~57]{hyotyla2016}. Parameters are as above, with \texttt{img}, \texttt{bheights} and \texttt{added} names of existing waves, while the other two will be created.
 
 \item[plot\_color, plot\_color\_auto]
 Creates the coloured areas on the scatterplot (or any other plot). \texttt{plot\_color} takes the color boundary positions as parameters, while \texttt{plot\_color\_auto} chooses the boundaries automatically based on the first $X$ wave data in the plot.
@@ -301,7 +307,7 @@ Concatenates multiple input waves into a single output wave and displays a scatt
 \end{description}
 
 \subsection{Loading rate analysis}
-The code in \path{lib/fca-loadingrate-analysis.ipf} was used to analyse the data and create the graphs for section~\ref{sec:loadingrate}. Unfortunately, the code is extremely specialised for the particular task and no effort has been spent to make it more general and user-friendly.
+The code in \path{lib/fca-loadingrate-analysis.ipf} was used to analyse the data and create the graphs for the loading rate analysis in \cite[p.~66]{hyotyla2016}. Unfortunately, the code is extremely specialised for the particular task and no effort has been spent to make it more general and user-friendly.
 The interested reader is welcome to look through the code and associated comments.
 
 
@@ -337,6 +343,19 @@ Although all graphs can use standard Igor zooming and scaling functions, many fo
 The zoom levels can be configured in the \path{config/fca-zoom-config.ipf} file.
 The configuration is done by editing a matrix with zoom values. Each field in the matrix corresponds to a curve type, zoom level, and axis.
 The source file has additional comments to help with finding the correct field for changing a specific zoom setting.
+
+
+
+
+
+\begin{thebibliography}{9}
+
+\bibitem[Hyotyla, 2016]{hyotyla2016}
+    Hyotyla, Janne T.
+    \emph{Nanomechanics of Confined Polymer Systems}.
+    2016, {PhD} Thesis, University of Basel, Faculty of Science.
+
+\end{thebibliography}
 
 
 \end{document}  
