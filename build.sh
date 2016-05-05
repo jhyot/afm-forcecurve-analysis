@@ -6,7 +6,7 @@
 # Build steps:
 # * Deletes the old build folder
 # * Generates the PDF manual from Latex source. A Tex distribution with pdflatex and necessary latex packages must be installed on the machine.
-# * Builds a zip archive with the programs files and the manual PDF
+# * Builds a zip archive with the program files and the PDF manual
 
 
 buildfolder="build"
