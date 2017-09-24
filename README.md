@@ -16,9 +16,7 @@ Features:
 * Data analysis, classification and review
 
 The software was originally written to perform data analysis for my PhD thesis:
-> Hyotyla, Janne T. Nanomechanics of Confined Polymer Systems. 2016, PhD Thesis, University of Basel, Faculty of Science.
-
-(link to online version coming soon)
+> Hyotyla, Janne T. Nanomechanics of Confined Polymer Systems. 2016, PhD Thesis, University of Basel, Faculty of Science. doi: 10.5451/unibas-006622415 ([download](http://edoc.unibas.ch/diss/DissB_11723))
 
 The main intent of this software package is to allow reproduction of the data analysis and presentation in the thesis.
 As such, the analysis functions are mostly tailored for indentation of polymer brush-like samples.
@@ -95,5 +93,5 @@ License
 -------
 This software is licensed under the Apache License 2.0. See the LICENSE file for full details.
 
-Copyright (c) 2016 Janne Hyötylä
+Copyright (c) 2016 Janne Hyötylä  
 Copyright (c) 2016 University of Basel
